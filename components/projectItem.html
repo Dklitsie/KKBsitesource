@@ -1,0 +1,73 @@
+<template id="project-item-template">
+  <style>
+    .child-container {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 0.5rem;
+    }
+
+    h3 {
+      display: inline-block;
+      font-size: 1.5rem;
+      margin: 0.5rem 0;
+      color: var(--secondary-red);
+      transition: all ease-in-out 100ms;
+    }
+
+    h3:hover {
+      color: var(--tertiary-blue);
+    }
+
+    p {
+      font-size: 1rem;
+      color: light-dark(var(--light-color), var(--dark-color));
+    }
+  </style>
+  <div>
+    <a id="title-link" target="_blank" style="text-decoration: none;">
+      <h3 id="title"></h3>
+    </a>
+    <div id="child-container" class="child-container"></div>
+    <p id="description"></p>
+  </div>
+</template>
+
+<script>
+  class ProjectItem extends HTMLElement {
+    constructor() {
+      super();
+      const template = document.getElementById('project-item-template').content.cloneNode(true);
+      this.attachShadow({mode: 'open'}).appendChild(template);
+    }
+
+    connectedCallback() {
+      const title = this.shadowRoot.getElementById("title");
+      const titleLink = this.shadowRoot.getElementById("title-link");
+      const childContainer = this.shadowRoot.getElementById("child-container");
+      const description = this.shadowRoot.getElementById("description");
+
+      const name = this.getAttribute("name");
+      const link = this.getAttribute("link");
+      const descriptionText = this.getAttribute("description");
+
+      if (name) {
+        title.textContent = name;
+        titleLink.href = link || "#";
+      }
+
+      if (descriptionText) description.textContent = descriptionText;
+
+      if (this.children.length > 0) {
+        Array.from(this.children).forEach(child => {
+          childContainer.appendChild(child.cloneNode(true));
+        });
+      } else {
+        childContainer.style.display = "none";
+      }
+    }
+  }
+
+  customElements.define('project-item', ProjectItem);
+</script>

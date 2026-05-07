@@ -1,0 +1,317 @@
+<style>
+    #blog-page {
+        display: flex;
+        flex-direction: row;
+        flex: 1 1 auto;
+        min-width: 0;
+        max-width: 100%;
+    }
+
+    #rendered-blog {
+        box-sizing: border-box;
+        padding: 1rem;
+        flex: 1 1 auto;
+        min-width: 0;
+        background-color: light-dark(var(--offwhite), var(--offblack));
+        border-color: light-dark(var(--offblack), var(--offwhite));
+        border-left: 1px dotted;
+        border-right: 1px dotted;
+        border-bottom: 1px dotted;
+        font-size: large;
+    }
+
+    #rendered-blog header {
+        display: flex;
+        flex-direction: row;
+        justify-content: space-between;
+    }
+
+    #rendered-blog header > span {
+        display: flex;
+        flex-direction: column;
+    }
+
+    #last-modified {
+        margin-top: 0.2rem;
+        margin-bottom: 0.2rem;
+    }
+
+    blog-selector-list {
+        margin: 0.5rem;
+    }
+
+    md-block {
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+        white-space: normal;
+    }
+
+    md-block hr {
+        border: 0.1px solid;
+        border-color: light-dark(var(--offblack), var(--offwhite));
+        filter: opacity(50%);
+    }
+
+    md-block p {
+        margin: 0 0.5rem;
+        line-height: 1.4;
+    }
+
+    md-block code {
+        padding: 2.5px;
+        border-radius: 3px;
+        background-color: light-dark(var(--light-color), var(--dark-color));
+        color: light-dark(var(--dark-color), var(--light-color));
+    }
+
+    md-block pre {
+        padding: 1rem;
+        border-radius: 4px;
+        overflow-x: auto;
+        white-space: pre;
+    }
+
+    md-block blockquote {
+        border-left: 4px solid
+            light-dark(var(--tertiary-blue), var(--secondary-red));
+        padding: 0.8rem 0.45rem;
+        margin: 1rem;
+        backdrop-filter: brightness(102%);
+        border-radius: 4px;
+    }
+
+    md-block blockquote p {
+        margin: 0;
+    }
+
+    md-block img {
+        max-width: 100%;
+        height: auto;
+        display: block;
+        object-fit: contain;
+    }
+
+    #navigation {
+        display: flex;
+        flex-direction: column;
+        width: max-content;
+        border: 1.5px solid light-dark(var(--light-border), var(--dark-border)) !important;
+    }
+
+    #navigation button {
+        padding: 1rem;
+        flex-grow: 1;
+        display: flex;
+        border: none !important;
+        box-shadow: none !important;
+        text-shadow: none !important;
+        transition: all ease-in 250ms;
+    }
+
+    #navigation button:not(:last-child) {
+        border-bottom: 2px solid
+            light-dark(var(--light-border), var(--dark-border)) !important;
+    }
+
+    #navigation button:hover,
+    #navigation button.selected {
+        background-color: var(--primary-orange);
+        color: var(--light-color);
+    }
+
+    small.xs {
+        font-size: 0.7em;
+        opacity: 0.75;
+    }
+
+    @keyframes fade-in {
+        from {
+            opacity: 0;
+        }
+    }
+
+    @keyframes fade-out {
+        to {
+            opacity: 0;
+        }
+    }
+
+    @keyframes slide-from-right {
+        from {
+            transform: translateX(90px);
+        }
+    }
+
+    @keyframes slide-to-left {
+        to {
+            transform: translateX(-90px);
+        }
+    }
+
+    /* define animations for the old and new content */
+    ::view-transition-old(slide-it) {
+        animation:
+            180ms cubic-bezier(0.4, 0, 1, 1) both fade-out,
+            600ms cubic-bezier(0.4, 0, 0.2, 1) both slide-to-left;
+    }
+
+    ::view-transition-new(slide-it) {
+        animation:
+            420ms cubic-bezier(0, 0, 0.2, 1) 90ms both fade-in,
+            600ms cubic-bezier(0.4, 0, 0.2, 1) both slide-from-right;
+    }
+
+    /* tie the view transition to a given CSS class */
+    .sample-transition {
+        view-transition-name: slide-it;
+    }
+
+    @media (max-width: 930px) {
+        #blog-page {
+            flex-direction: column;
+        }
+
+        blog-selector-list {
+            justify-content: center;
+        }
+
+        #rendered-blog {
+            padding: 0.25rem 0.5rem;
+            border-top: 1px dotted;
+        }
+
+        #rendered-blog header {
+            flex-direction: column;
+        }
+
+        md-block pre {
+            padding: 0.5rem;
+            border-radius: 2px;
+        }
+
+        #navigation {
+            width: 100%;
+            margin-left: auto;
+            margin-right: auto;
+            flex-direction: row;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        #navigation button {
+            flex: 0 0 auto;
+            border-bottom: 2px solid
+                light-dark(var(--light-border), var(--dark-border)) !important;
+        }
+
+        #navigation button:not(:last-child) {
+            border-right: 1px solid
+                light-dark(var(--light-border), var(--dark-border)) !important;
+        }
+    }
+</style>
+
+<div id="blog-page">
+    <script>
+        /**
+         * Updates the route buttons to mark one as selected and clear the rest.
+         *
+         * @param {string} selectedButtonId - The `id` of the button to mark as selected.
+         */
+        function setButtonSelected(selectedButtonId) {
+            const navigation = document.getElementById("navigation");
+            for (const button of navigation.children) {
+                if (button.id === selectedButtonId) {
+                    button.classList.add("selected");
+                } else {
+                    button.classList.remove("selected");
+                }
+            }
+        }
+
+        /**
+         * Formats a timestamp in nanoseconds to a human-readable string.
+         *
+         * @param {number} nanos
+         */
+        function formatNanos(nanos) {
+            const big_int = BigInt(nanos);
+            const millisBigInt = big_int / 1_000_000n;
+            const millis = Number(millisBigInt);
+            return new Date(millis).toLocaleString("en-US", {
+                timeZone: "America/Los_Angeles",
+                weekday: "long",
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+                hour: "numeric",
+                minute: "numeric",
+                second: "numeric",
+                hour12: true,
+                timeZoneName: "short",
+            });
+        }
+
+        document
+            .getElementById("blog-page")
+            .addEventListener("htmx:beforeProcessNode", () => {
+                const navigation = document.getElementById("navigation");
+                const query = window.location.search;
+                const blog_name = query.split("=")[1];
+                const id = `${blog_name}-selector`;
+                setButtonSelected(id);
+            });
+
+        /**
+         * Updates the route buttons to mark one as selected and clear the rest.
+         *
+         * @param {number} lastModified - in nanoseconds
+         * @param {number} created - in nanoseconds
+         */
+        function renderStats(lastModified, created) {
+            const lastModifiedEl = document.getElementById("last-modified");
+            const createdEl = document.getElementById("created");
+            if (!createdEl || !lastModifiedEl)
+                console.error("Missing elements");
+            createdEl.textContent = `✎ ${formatNanos(created)}`;
+            if (created !== lastModified) {
+                lastModifiedEl.textContent = `↻ ${formatNanos(lastModified)}`;
+            }
+        }
+    </script>
+
+    <div>
+        <section id="navigation">
+            ||zz for .all_blogs zz||
+            <button
+                class="crt"
+                hx-on::xhr:loadend="setButtonSelected(event.detail.elt.id);"
+                id="{|.uri_path|}-selector"
+                hx-get="/Blog?post={|.uri_path|}"
+                hx-target="#rendered-blog"
+                hx-select="#rendered-blog"
+                hx-swap="outerHTML transition:true"
+                hx-push-url="true"
+            >
+                {|.name|}
+            </button>
+            ||zz endfor zz||
+        </section>
+    </div>
+    <div id="rendered-blog">
+        <header>
+            <small> {|.filename|} </small>
+            <span>
+                <small class="xs" id="created"></small>
+                <small class="xs" id="last-modified"></small>
+            </span>
+        </header>
+        <script>
+            renderStats({|.last_modified|}, {|.created|});
+            document.addEventListener("DOMContentLoaded", () => {
+              renderStats({|.last_modified|}, {|.created|});
+            });
+        </script>
+        <md-block src="blog/{|.filename|}"> </md-block>
+    </div>
+</div>

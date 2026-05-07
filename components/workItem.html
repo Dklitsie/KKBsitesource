@@ -1,0 +1,73 @@
+<template id="work-item-template">
+  <style>
+    h3.has-link {
+      transition: all ease-in-out 100ms;
+    }
+
+
+    h3.has-link:hover {
+      color: var(--tertiary-blue);
+    }
+
+    h3 {
+      color: var(--secondary-red);
+      display: inline-block;
+    }
+
+    h4 {
+      color: var(--tertiary-blue);
+    }
+
+    p {
+      font-size: 1rem;
+      color: light-dark(var(--light-color), var(--dark-color));
+    }
+  </style>
+  <div>
+    <h3 id="company-name"></h3>
+    <a id="company-link" href="_blank" style="text-decoration: none;">
+      <h3></h3>
+    </a>
+    <h4 id="position"></h4>
+    <h4 id="start-end"></h4>
+    <p id="description"></p>
+  </div>
+</template>
+
+<script>
+  class WorkItem extends HTMLElement {
+    constructor() {
+      super();
+      const template = document.getElementById('work-item-template').content.cloneNode(true);
+      this.attachShadow({mode: 'open'}).appendChild(template);
+    }
+
+    connectedCallback() {
+      const companyName = this.shadowRoot.getElementById("company-name");
+      const companyLink = this.shadowRoot.getElementById("company-link");
+      const position = this.shadowRoot.getElementById("position");
+      const startEnd = this.shadowRoot.getElementById("start-end");
+      const description = this.shadowRoot.getElementById("description");
+      const company = this.getAttribute("company");
+      const link = this.getAttribute("link");
+      const positionText = this.getAttribute("position");
+      const startDate = this.getAttribute("startDate");
+      const endDate = this.getAttribute("endDate") || "Present";
+      const descriptionText = this.getAttribute("description");
+
+      if (company) {
+        companyName.textContent = company;
+        if (link) {
+          companyLink.href = link;
+          companyLink.firstElementChild.textContent = company;
+          companyName.replaceWith(companyLink);
+        }
+      }
+      if (positionText) position.textContent = positionText;
+      if (startDate) startEnd.textContent = `(${startDate} - ${endDate})`;
+      if (descriptionText) description.textContent = descriptionText;
+    }
+  }
+
+  customElements.define('work-item', WorkItem);
+</script>

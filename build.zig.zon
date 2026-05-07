@@ -1,0 +1,27 @@
+.{
+    .name = .zortfolio,
+    .fingerprint = 0x3cc39afcb1d786fa,
+
+    .version = "1.0.0",
+
+    .dependencies = .{
+        .zemplate = .{
+            .url = "git+https://github.com/voidKandy/zemplate#39bc091b4c47baecd6236c4f0c19f40ce6c89fd8",
+            .hash = "zemplate-1.5.1-tSKpW9tKAQDOruerwsqO5xtoUcuzs8bVRNgZYfOU5pBS",
+        },
+        .btzdotenv = .{
+            .url = "git+https://github.com/voidKandy/btzdotenv#e23c9ca7d6b2aa783110d7113100a2965a2028e1",
+            .hash = "btzdotenv-1.0.0-AAAAAD4IAABFkToVB49U2ySUr62bpfuGelN8lo2fG11H",
+        },
+        .zyph = .{
+            .url = "git+https://github.com/voidKandy/zyph#ec4b2628ad3652ca4a699d6a791d6c5563f57607",
+            .hash = "zyph-0.2.5-z6Sw_X3EAADuHweCSSEX1U9tTx8mSa1L3iFhXI7rRTq7",
+        },
+    },
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+        "README.md",
+    },
+}

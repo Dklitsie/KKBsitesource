@@ -1,0 +1,63 @@
+<template id="dark-mode-button-template">
+  <button id="dark-mode-button" class="crt"></button>
+</template>
+
+<script>
+  class DarkModeButton extends HTMLElement {
+    connectedCallback() {
+
+      const template = document.getElementById('dark-mode-button-template').content.cloneNode(true);
+      this.appendChild(template);
+      this.button = this.querySelector("#dark-mode-button");
+
+      if (localStorage.getItem('dark') === null) {
+        localStorage.setItem('dark', this.defaultDark ? "true" : "false");
+      }
+
+      this.button.textContent = this.darkIsSet ? this.darkModeText : this.lightModeText;
+
+      this.button.addEventListener('click', () => {
+        this.toggleDarkMode();
+        this.button.textContent = this.darkIsSet ? this.darkModeText : this.lightModeText;
+      });
+
+      this.applyDarkMode();
+    }
+
+    get defaultDark() {
+      return this.getAttribute('defaultDark') === 'true';
+    }
+
+    get lightModeText() {
+      return this.getAttribute('lightModeText') || 'Light Mode!';
+    }
+
+    get darkModeText() {
+      return this.getAttribute('darkModeText') || 'Dark Mode!';
+    }
+
+    get darkIsSet() {
+      return localStorage.getItem('dark') === "true";
+    }
+
+    applyDarkMode() {
+      if (this.darkIsSet) {
+        document.body.classList.add("dark");
+      } else {
+        document.body.classList.remove("dark");
+      }
+    }
+
+    toggleDarkMode() {
+      if (this.darkIsSet) {
+        document.body.classList.remove("dark");
+        localStorage.setItem('dark', "false");
+      } else {
+        document.body.classList.add("dark");
+        localStorage.setItem('dark', "true");
+      }
+    }
+  }
+
+  customElements.define('dark-mode-button', DarkModeButton);
+</script>

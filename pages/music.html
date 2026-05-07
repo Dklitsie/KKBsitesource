@@ -1,0 +1,34 @@
+<style>
+  .music-container {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+    padding: 1rem;
+  }
+
+  @media (max-width: 1070px) {
+    .music-container {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
+  }
+</style>
+
+
+
+<div style="display: flex; flex-direction: column">
+  <h1>All album art done by either me or my
+    <a style="text-decoration: none;" href="https://www.trystanfrench.com/" target="_blank">
+      wife
+    </a>
+  </h1>
+  <div class="music-container">
+    ||zz for .all_albums zz||
+    <music-display name="{|.name|}" image="{|.image_url|}" release="{|.release_date|}" spotify_url="{|.spotify_url|}">
+    </music-display>
+    ||zz endfor zz||
+
+  </div>
+</div>

@@ -1,0 +1,83 @@
+<template id="display-box-template">
+  <style>
+    .container {
+      display: flex;
+      flex-direction: column;
+      border-style: solid;
+      border-width: 2.5px;
+      border-color: light-dark(var(--light-border), var(--dark-border));
+      background-color: light-dark(var(--offwhite), var(--offblack));
+      margin: 1rem;
+      box-shadow: 1px 3px 3px light-dark(rgba(0, 0, 0, 0.4), rgba(200, 200, 200, 0.4));
+      transition: all ease-in-out 200ms;
+      filter: saturate(150%);
+    }
+
+    ::slotted(:first-child) {
+      margin-bottom: 0;
+    }
+
+    ::slotted(:last-child) {
+      margin-top: 0;
+    }
+
+    ::slotted(*) {
+      transition: transform 200ms ease-in, transform 400ms ease-out;
+      margin: 1rem 2rem;
+    }
+
+    ::slotted(*):hover {
+      transform: scale(1.005);
+    }
+
+    ::slotted(:not(:last-child)) {
+      border-bottom: 2px dotted light-dark(var(--light-border), var(--dark-border));
+      padding-bottom: 1rem;
+    }
+
+
+    .container:hover {
+      box-shadow: 2px 4px 2px light-dark(rgba(0, 0, 0, 0.5), rgba(200, 200, 200, 0.5));
+    }
+
+    .container:hover>.display-box-title {
+      filter: saturate(110%);
+    }
+
+    .display-box-title {
+      text-align: center;
+      padding: 1rem 0;
+      width: 100%;
+      border-bottom: 2px solid light-dark(var(--light-border), var(--dark-border));
+      background-color: var(--primary-orange);
+      font-size: 1.5rem;
+      font-weight: bold;
+      color: var(--light-color);
+      margin: 0;
+      transition: all ease-in-out 200ms;
+    }
+  </style>
+
+  <div class="container">
+    <h2 class="display-box-title"></h2>
+    <slot></slot>
+  </div>
+</template>
+
+<script>
+  class DisplayBox extends HTMLElement {
+    constructor() {
+      super();
+      const template = document.getElementById('display-box-template');
+      const templateContent = template.content;
+      this.attachShadow({mode: 'open'}).appendChild(templateContent.cloneNode(true));
+    }
+
+    connectedCallback() {
+      const title = this.getAttribute("title");
+      this.shadowRoot.querySelector('.display-box-title').textContent = title;
+    }
+  }
+
+  customElements.define('display-box', DisplayBox);
+</script>

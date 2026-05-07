@@ -1,0 +1,168 @@
+<template id="nav-router-template">
+  <style>
+    #routes-container {
+      display: flex;
+      flex-direction: row;
+      gap: 1rem;
+      justify-content: center;
+    }
+
+    @keyframes fade-in {
+      from {
+        opacity: 0;
+      }
+    }
+
+    @keyframes fade-out {
+      to {
+        opacity: 0;
+      }
+    }
+
+    @keyframes slide-from-right {
+      from {
+        transform: translateX(90px);
+      }
+    }
+
+    @keyframes slide-to-left {
+      to {
+        transform: translateX(-90px);
+      }
+    }
+
+    ::view-transition-old(slide-it) {
+      animation:
+        180ms cubic-bezier(0.4, 0, 1, 1) both fade-out,
+        600ms cubic-bezier(0.4, 0, 0.2, 1) both slide-to-left;
+    }
+
+    ::view-transition-new(slide-it) {
+      animation:
+        420ms cubic-bezier(0, 0, 0.2, 1) 90ms both fade-in,
+        600ms cubic-bezier(0.4, 0, 0.2, 1) both slide-from-right;
+    }
+
+    .slide-transition {
+      view-transition-name: slide-it;
+    }
+  </style>
+
+  <div id="routes-container"></div>
+</template>
+
+<script>
+  class NavRouter extends HTMLElement {
+    connectedCallback() {
+      const template = document
+        .getElementById('nav-router-template')
+        .content.cloneNode(true)
+      this.appendChild(template)
+
+      this.currentPath =
+        window.location.pathname.replace(/^\/+/, '') || this.defaultRoute
+      this.currentQuery = window.location.search.replace(/^\?/, '') || undefined
+
+      if (this.routes.length === 0) {
+        console.log('No routes provided')
+        return
+      }
+
+      const routeContentContainer = document.querySelector('#route-content')
+      // cant use because nested transitions don't work
+      // routeContentContainer.classList.add("slide-transition");
+      this.routesContainer = this.querySelector('#routes-container')
+      this.routeButtonMap = new Map()
+
+      this.routes.forEach((route) => {
+        const button = document.createElement('button')
+        button.textContent = route
+        button.id = `${route}_route`
+        button.classList.add('crt')
+
+        if (route === this.defaultRoute) {
+          button.setAttribute('hx-get', `/`)
+        } else {
+          button.setAttribute('hx-get', `/${route} `)
+        }
+        button.setAttribute('hx-target', this.target)
+        button.setAttribute('hx-swap', `${this.swap} transition:true`)
+        button.setAttribute('hx-push-url', 'true')
+
+        button.addEventListener('htmx:xhr:loadend', (evt) => {
+          this.setButtonSelected(evt.detail.elt.id)
+        })
+
+        this.routeButtonMap.set(route, button)
+        this.routesContainer.appendChild(button)
+      })
+
+      document.addEventListener('DOMContentLoaded', () => {
+        const path = window.location.pathname.replace(/^\/+/, '')
+        let selectedButtonId = null
+
+        for (const [route, button] of this.routeButtonMap.entries()) {
+          const isHome = path === '' && route === this.defaultRoute
+          const isMatch = path !== '' && route === path
+
+          if (isHome || isMatch) {
+            selectedButtonId = button.id
+            break
+          }
+        }
+
+        if (selectedButtonId) {
+          this.setButtonSelected(selectedButtonId)
+        }
+      })
+    }
+
+    /**
+     * Updates the route buttons to mark one as selected and clear the rest.
+     *
+     * @param {string} selectedButtonId - The `id` of the button to mark as selected.
+     */
+    setButtonSelected(selectedButtonId) {
+      const selected_marker = '* '
+
+      for (const [route, button] of this.routeButtonMap.entries()) {
+        if (button.id === selectedButtonId) {
+          if (!button.textContent.startsWith(selected_marker)) {
+            button.textContent = `${selected_marker}${route}`
+          }
+        } else {
+          button.textContent = button.textContent.replace(selected_marker, '')
+        }
+      }
+    }
+
+    get swap() {
+      return this.getAttribute('swap') || 'innerHTML'
+    }
+
+    get target() {
+      const target = this.getAttribute('target')
+      if (target == null) {
+        console.log(
+          'you should pass a target with a routes-nav component target',
+        )
+      }
+      return target || ''
+    }
+
+    /**
+     * @returns {Array<string>}
+     **/
+    get routes() {
+      return (this.getAttribute('routes') || '')
+        .split(',')
+        .map((route) => route.trim())
+    }
+
+    get defaultRoute() {
+      return this.getAttribute('defaultRoute') || this.routes[0]
+    }
+  }
+
+  customElements.define('nav-router', NavRouter)
+</script>

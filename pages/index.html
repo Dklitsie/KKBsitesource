@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- HTMX Stuff -->
+    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+
+    <!-- Misc -->
+    <script type="module" src="https://md-block.verou.me/md-block.js"></script>
+
+    <link href="styles/prism.css" rel="stylesheet" />
+    <script src="scripts/prism.js"></script>
+
+    <!-- Styles -->
+    <link rel="stylesheet" href="styles/global.css" />
+
+    <title>Kes Klitsie Burrows Illustration</title>
+
+    <style>
+      #frame {
+        display: flex;
+        flex-direction: column;
+        background-color: light-dark(var(--light-bg), var(--dark-bg));
+        z-index: 2;
+        align-content: center;
+        justify-content: space-between;
+        width: 80vw;
+        min-height: 100vh;
+      }
+
+      #route-content {
+        display: flex;
+        /* Prevents it from affecting the height of #frame */
+        flex-grow: 1;
+        /* Keeps content scrollable if it overflows */
+        overflow-y: auto;
+        overflow-x: hidden;
+        height: 100%;
+      }
+
+      nav-router button {
+        background-color: var(--primary-orange);
+        filter: saturate(500%);
+      }
+    </style>
+  </head>
+
+  <body>
+    <script>
+      document.body.addEventListener('htmx:beforeRequest', (event) => {
+        const children = document.querySelector('#components-cache').children
+        const set = new Set()
+
+        for (const el of children) {
+          if (el instanceof HTMLScriptElement) {
+            continue
+          }
+          const cleanName = el.id.replace(/-template$/, '')
+          if (cleanName.trim().length > 0) {
+            set.add(cleanName)
+          }
+        }
+
+        event.detail.xhr.setRequestHeader(
+          'x-hydrated',
+          JSON.stringify([...set]),
+        )
+      })
+    </script>
+
+    <div id="frame">
+      <div
+        style="display: flex; flex-direction: column; margin: 1rem; gap: 1rem"
+      >
+        <img
+          src="imgs/KesKlitsieBurrows.png"
+          alt="Kes Klitsie Burrows"
+          style="max-height: 25vh"
+        />
+        <img
+          src="imgs/Illustration.png"
+          alt="Illustration"
+          style="max-height: 20vh"
+        />
+      </div>
+
+      <div style="display: flex; flex-direction: column; flex-grow: 1">
+        <nav-router routes="Home, Info, Blog" target="#route-content">
+        </nav-router>
+        <div id="route-content" hx-history-elt>{|.route_content|}</div>
+      </div>
+      <div style="margin-top: 1rem">
+        <color-squares> </color-squares>
+      </div>
+    </div>
+  </body>
+</html>

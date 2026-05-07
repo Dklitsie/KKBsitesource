@@ -1,0 +1,55 @@
+<style>
+  .info-container {
+    margin: 5rem auto 0 auto;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    gap: 2rem;
+  }
+
+  .contact {
+    display: flex;
+    flex-direction: column;
+    text-align: center;
+    justify-self: center;
+    margin-top: 1rem;
+  }
+
+
+  @media (max-width: 930px) {
+    .info-container {
+      margin: 2rem 2rem 0 2rem;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    #dev-env {
+      display: none;
+    }
+  }
+</style>
+
+<div class="info-container">
+  <div id="site-info">
+    <easy-table header="Site Info"
+      row-aesthetic-inspration="seated.ro:seated.ro, Us-Graphics-Company:usgraphics.com, Geth:geth.ethereum.org, K.O.-II:teenage.engineering/products/ep-133, Macintosh:infinitemac.org/1997/Mac%20OS%207.6  "
+      row-frontend="Vanilla Css, Web-Components:developer.mozilla.org/en-US/docs/Web/API/Web_components#custom_elements_2, HTMX:htmx.org"
+      row-backend="Zig:github.com/voidKandy/zortfolio">
+    </easy-table>
+  </div>
+
+
+  <div style="display: flex; flex-grow: 1;flex-direction: column; ">
+    <easy-table id="dev-env" header="Dev Environment" row-editor="helix:helix-editor.com"
+      row-terminal="ghostty:ghostty.org" row-keyboard="voyager:www.zsa.io/voyager" row-machine="14-inch M2 MacBook Pro">
+    </easy-table>
+
+    <div class="contact">
+      <a href="mailto:voidkandy@gmail.com" target="_blank">voidkandy@gmail.com</a>
+      <a href="https://github.com/voidKandy" target="_blank">
+        github.com/voidKandy </a>
+      <a href="https://x.com/KandyVoid" target="_blank">
+        x.com/KandyVoid </a>
+    </div>
+  </div>
+</div>
