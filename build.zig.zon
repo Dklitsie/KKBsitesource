@@ -14,8 +14,8 @@
             .hash = "btzdotenv-1.0.0-AAAAAD4IAABFkToVB49U2ySUr62bpfuGelN8lo2fG11H",
         },
         .zyph = .{
-            .url = "git+https://github.com/voidKandy/zyph#ec4b2628ad3652ca4a699d6a791d6c5563f57607",
-            .hash = "zyph-0.2.5-z6Sw_X3EAADuHweCSSEX1U9tTx8mSa1L3iFhXI7rRTq7",
+            .url = "git+https://github.com/voidKandy/zyph#e64d3d289cca5aa8e0951bc9ee586fb3c0dd4859",
+            .hash = "zyph-0.2.6-z6Sw_YHEAABWE-5to-OgEEEzc3HsO_Ai57RUTEShEgrI",
         },
     },
     .paths = .{
