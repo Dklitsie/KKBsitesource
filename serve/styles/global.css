@@ -1,36 +1,19 @@
 @import url('https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400..800;1,400..800&display=swap');
 
 :root {
-  color-scheme: light dark;
   /* --flicker-speed: .001s; */
-  --offwhite: #dacebf;
-  --offblack: #333333;
+  --bg: #ebe5dc;
+  --text: #2c2c2c;
+  --border: #000000;
+  --button-bg: #d1c4b6;
 
-  --light-bg: #ffffff;
-  --light-color: #2c2c2c;
-  --light-border: #000000;
-  --light-button: #d1c4b6;
-
-  --dark-bg: #2c2c2c;
-  --dark-color: #d1c4b6;
-  --dark-border: #e8dcd3;
-  --dark-button: #2c2c2c;
-
-  --primary-orange: #fdb571;
-  --secondary-red: #e3174a;
-  --tertiary-blue: #69a2b0;
-  --box-shadow-color: var(--light-border);
-}
-
-.dark {
-  color-scheme: dark !important;
-  --box-shadow-color: var(--dark-border);
+  --box-shadow-color: var(--border);
 }
 
 body {
   font-family: 'EB Garamond', serif;
-  background-color: light-dark(var(--light-bg), var(--dark-bg));
-  color: light-dark(var(--light-color), var(--dark-color));
+  background-color: var(--bg);
+  color: var(--color);
   margin: 0;
   padding: 0;
   display: flex;
@@ -55,14 +38,14 @@ a:hover {
   margin: 2rem;
   border-style: solid;
   border-width: 5px;
-  border-color: light-dark(var(--light-border), var(--dark-border));
+  border-color: var(--border);
 }
 
 .small-box {
   padding: 2rem;
   border-style: double;
   border-width: 5px;
-  border-color: light-dark(var(--light-border), var(--dark-border));
+  border-color: var(--border);
   margin: 4rem;
 }
 
@@ -81,26 +64,6 @@ body::before {
   pointer-events: none;
 }
 
-body.dark button {
-  box-shadow: 3px 3px var(--dark-border);
-}
-
-body.dark button:hover {
-  box-shadow: 0.5px 0.5px var(--dark-border);
-  /* text-shadow: */
-  /* 1px 1px 0 var(--light-color); */
-}
-
-body:not(.dark) button {
-  box-shadow: 3px 3px var(--light-border);
-}
-
-body:not(.dark) button:hover {
-  box-shadow: 0.5px 0.5px var(--light-border);
-  /* text-shadow: */
-  /* 1px 1px 0 var(--dark-color); */
-}
-
 nav-router button {
   color: var(--offblack);
 }
@@ -111,9 +74,9 @@ button {
   border-style: solid;
   border-width: 2px;
   padding: 0.5rem;
-  color: light-dark(var(--offblack), var(--offwhite));
-  border-color: light-dark(var(--light-border), var(--dark-border));
-  background-color: light-dark(var(--light-button), var(--dark-button));
+  color: var(--offblack);
+  border-color: var(--border);
+  background-color: var(--button);
   cursor: pointer;
   transition: all ease-in-out 200ms;
 }

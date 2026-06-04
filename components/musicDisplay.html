@@ -8,14 +8,16 @@
       box-sizing: border-box;
       max-width: 400px;
       overflow: hidden;
-      box-shadow: 1px 3px 3px light-dark(rgba(0, 0, 0, 0.4), rgba(200, 200, 200, 0.4));
-      border: 3px double light-dark(var(--light-border), var(--dark-border));
-      transition: all 200ms ease-in, all 400ms ease-out;
+      box-shadow: 1px 3px 3px rgba(0, 0, 0, 0.4);
+      border: 3px double var(--border);
+      transition:
+        all 200ms ease-in,
+        all 400ms ease-out;
     }
 
     .wrapper:hover {
       transform: scale(1.003);
-      box-shadow: 2px 4px 2px light-dark(rgba(0, 0, 0, 0.5), rgba(200, 200, 200, 0.5));
+      box-shadow: 2px 4px 2px rgba(0, 0, 0, 0.5);
     }
 
     .background-container {
@@ -99,18 +101,22 @@
   class MusicDisplay extends HTMLElement {
     constructor() {
       super();
-      const template = document.getElementById('music-display-template').content.cloneNode(true);
-      this.attachShadow({mode: 'open'}).appendChild(template);
+      const template = document
+        .getElementById('music-display-template')
+        .content.cloneNode(true);
+      this.attachShadow({ mode: 'open' }).appendChild(template);
     }
 
     connectedCallback() {
-      const wrapper = this.shadowRoot.querySelector(".wrapper");
-      const backgroundContainer = this.shadowRoot.querySelector(".background-container");
-      const container = this.shadowRoot.querySelector(".container");
-      const titleLink = this.shadowRoot.querySelector(".title-and-release a");
-      const title = this.shadowRoot.querySelector(".title-and-release h3");
-      const release = this.shadowRoot.querySelector(".title-and-release h4");
-      const img = this.shadowRoot.querySelector("img");
+      const wrapper = this.shadowRoot.querySelector('.wrapper');
+      const backgroundContainer = this.shadowRoot.querySelector(
+        '.background-container',
+      );
+      const container = this.shadowRoot.querySelector('.container');
+      const titleLink = this.shadowRoot.querySelector('.title-and-release a');
+      const title = this.shadowRoot.querySelector('.title-and-release h3');
+      const release = this.shadowRoot.querySelector('.title-and-release h4');
+      const img = this.shadowRoot.querySelector('img');
 
       backgroundContainer.style.backgroundImage = `url("${this.image}")`;
 
@@ -122,19 +128,19 @@
     }
 
     get name() {
-      return this.getAttribute("name") || "Unknown";
+      return this.getAttribute('name') || 'Unknown';
     }
 
     get image() {
-      return this.getAttribute("image") || "";
+      return this.getAttribute('image') || '';
     }
 
     get release() {
-      return this.getAttribute("release") || "Unknown Release";
+      return this.getAttribute('release') || 'Unknown Release';
     }
 
     get spotify_url() {
-      return this.getAttribute("spotify_url") || "#";
+      return this.getAttribute('spotify_url') || '#';
     }
   }
 

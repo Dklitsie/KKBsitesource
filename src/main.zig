@@ -1,6 +1,7 @@
 const std = @import("std");
 const zap = @import("zap");
 const zemplate = @import("zemplate");
+const drive = @import("drive.zig");
 const zyph = @import("zyph");
 const Request = std.http.Server.Request;
 
@@ -11,6 +12,10 @@ pub const std_options = std.Options{
 
 const EmptyTemplate = zemplate.Template(@TypeOf(.{}));
 
+const Editorial = struct {
+    image_items: []const drive.DriveFile,
+};
+
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{
         .thread_safe = true,
@@ -20,6 +25,12 @@ pub fn main() !void {
     const allocator = gpa.allocator();
     var server = zyph.Server.init(allocator, "serve");
     defer server.deinit();
+
+    var thumbnail_urls = try drive.getFilesMap(allocator);
+    defer drive.deinitFilesMap(allocator, &thumbnail_urls);
+
+    const editorial_imgs = thumbnail_urls.get(@tagName(.editorial)).?;
+    var editorial = Editorial{ .image_items = editorial_imgs };
 
     var hydration_context = try zyph.hydration_middleware.Context.init(
         allocator,
@@ -47,6 +58,15 @@ pub fn main() !void {
                 var t = try EmptyTemplate.init(a, obj.*);
                 defer t.deinit();
                 const render = try t.render(@embedFile("info.html"), .{});
+                try w.writeAll(render);
+            }
+        }.handler),
+
+        try server.registerHypermediaEndpoint("/Editorial", &editorial, &struct {
+            fn handler(obj: *Editorial, a: std.mem.Allocator, _: Request, w: *std.Io.Writer) anyerror!void {
+                var t = try zemplate.Template(Editorial).init(a, obj.*);
+                defer t.deinit();
+                const render = try t.render(@embedFile("editorial.html"), .{});
                 try w.writeAll(render);
             }
         }.handler),
