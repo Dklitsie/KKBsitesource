@@ -1,5 +1,67 @@
-<div style="flex-direction: column">
+<style>
+  .gallery {
+  }
+
+  .gallery img {
+    width: 240px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: transform 0.1s ease;
+  }
+
+  .gallery img:hover {
+    transform: scale(1.02);
+  }
+
+  #img-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.85);
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+  }
+
+  #img-modal img {
+    max-width: 90vw;
+    max-height: 90vh;
+    border-radius: 6px;
+  }
+</style>
+
+<div class="gallery">
   ||zz for .image_items zz||
-  <img loading="lazy" src="https://drive.google.com/thumbnail?id={|.id|}" />
+  <img
+    loading="lazy"
+    src="https://drive.google.com/thumbnail?id={|.id|}"
+    onclick="openModal('{|.id|}')"
+  />
   ||zz endfor zz||
 </div>
+
+<div id="img-modal" onclick="closeModal()">
+  <img id="img-modal-content" />
+</div>
+
+<script>
+  function openModal(id) {
+    const modal = document.getElementById('img-modal');
+    const img = document.getElementById('img-modal-content');
+
+    img.src = `https://drive.google.com/thumbnail?id=${id}&sz=w2000`;
+    modal.style.display = 'flex';
+  }
+
+  function closeModal() {
+    const modal = document.getElementById('img-modal');
+    const img = document.getElementById('img-modal-content');
+
+    modal.style.display = 'none';
+    img.src = '';
+  }
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeModal();
+  });
+</script>
