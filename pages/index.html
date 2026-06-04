@@ -106,15 +106,25 @@
         />
       </div>
 
+      <div id="img-modal">
+        <img id="img-modal-content" />
+      </div>
       <div style="display: flex; flex-direction: column; flex-grow: 1">
         <nav-router
           routes="Home, Info, Editorial, PictureBook, Sketch, Portraits"
           target="#route-content"
         >
         </nav-router>
+
         <div id="route-content" hx-history-elt>{|.route_content|}</div>
       </div>
-      <footer style="margin-top: 1rem"></footer>
+      <footer style="margin-top: 1rem">
+        <img
+          src="imgs/palettePNG.png"
+          alt="palette"
+          style="max-height: 25vh; max-width: 100%; object-fit: contain"
+        />
+      </footer>
     </div>
   </body>
 </html>

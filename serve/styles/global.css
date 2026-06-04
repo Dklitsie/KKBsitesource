@@ -7,7 +7,11 @@
   --border: #000000;
   --button-bg: #d1c4b6;
 
-  --box-shadow-color: var(--border);
+  --brown: #9c512d;
+  --red: #ff4204;
+  --blue: #528ab1;
+  --yellow: #f7ad02;
+  --peach: #fb9155;
 }
 
 body {

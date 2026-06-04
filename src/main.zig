@@ -12,9 +12,33 @@ pub const std_options = std.Options{
 
 const EmptyTemplate = zemplate.Template(@TypeOf(.{}));
 
-const Editorial = struct {
+const ImagesPage = struct {
     image_items: []const drive.DriveFile,
 };
+
+inline fn titleCase(comptime s: []const u8) [calcTitleCaseLen(s)]u8 {
+    var result: [calcTitleCaseLen(s)]u8 = undefined;
+    var i: usize = 0;
+    var capitalize = true;
+    for (s) |c| {
+        if (c == '_') {
+            capitalize = true;
+            continue;
+        }
+        result[i] = if (capitalize) std.ascii.toUpper(c) else c;
+        capitalize = false;
+        i += 1;
+    }
+    return result;
+}
+
+inline fn calcTitleCaseLen(comptime s: []const u8) usize {
+    var len = 0;
+    for (s) |c| {
+        if (c != '_') len += 1;
+    }
+    return len;
+}
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{
@@ -30,13 +54,13 @@ pub fn main() !void {
     defer drive.deinitFilesMap(allocator, &thumbnail_urls);
 
     const editorial_imgs = thumbnail_urls.get(@tagName(drive.ImageCategories.editorial)).?;
-    var editorial = Editorial{ .image_items = editorial_imgs };
+    var editorial = ImagesPage{ .image_items = editorial_imgs };
     const picture_book_imgs = thumbnail_urls.get(@tagName(drive.ImageCategories.picture_book)).?;
-    var picture_book = Editorial{ .image_items = picture_book_imgs };
+    var picture_book = ImagesPage{ .image_items = picture_book_imgs };
     const sketch_imgs = thumbnail_urls.get(@tagName(drive.ImageCategories.sketch)).?;
-    var sketch = Editorial{ .image_items = sketch_imgs };
+    var sketch = ImagesPage{ .image_items = sketch_imgs };
     const portraits_imgs = thumbnail_urls.get(@tagName(drive.ImageCategories.portraits)).?;
-    var portraits = Editorial{ .image_items = portraits_imgs };
+    var portraits = ImagesPage{ .image_items = portraits_imgs };
 
     var hydration_context = try zyph.hydration_middleware.Context.init(
         allocator,
@@ -48,6 +72,24 @@ pub fn main() !void {
         zyph.hydration_middleware.NAME,
         zyph.Middleware.init(.post, &hydration_context, &zyph.hydration_middleware.handler),
     );
+
+    inline for ([_]drive.ImageCategories{ .editorial, .picture_book, .portraits, .sketch }) |category| {
+        const page = switch (category) {
+            .editorial => &editorial,
+            .picture_book => &picture_book,
+            .portraits => &portraits,
+            .sketch => &sketch,
+        };
+        const handler = try server.registerHypermediaEndpoint("/" ++ titleCase(@tagName(category)), page, &struct {
+            fn handler(obj: *ImagesPage, a: std.mem.Allocator, _: Request, w: *std.Io.Writer) anyerror!void {
+                var t = try zemplate.Template(ImagesPage).init(a, obj.*);
+                defer t.deinit();
+                const render = try t.render(@embedFile(@tagName(category) ++ ".html"), .{});
+                try w.writeAll(render);
+            }
+        }.handler);
+        try handler.addMiddlewares(.post, &.{zyph.hydration_middleware.NAME});
+    }
 
     for (&[_]zyph.Server.RouteHandler{
         try server.registerHypermediaEndpoint("/", &.{}, &struct {
@@ -64,39 +106,6 @@ pub fn main() !void {
                 var t = try EmptyTemplate.init(a, obj.*);
                 defer t.deinit();
                 const render = try t.render(@embedFile("info.html"), .{});
-                try w.writeAll(render);
-            }
-        }.handler),
-
-        try server.registerHypermediaEndpoint("/Editorial", &editorial, &struct {
-            fn handler(obj: *Editorial, a: std.mem.Allocator, _: Request, w: *std.Io.Writer) anyerror!void {
-                var t = try zemplate.Template(Editorial).init(a, obj.*);
-                defer t.deinit();
-                const render = try t.render(@embedFile("editorial.html"), .{});
-                try w.writeAll(render);
-            }
-        }.handler),
-        try server.registerHypermediaEndpoint("/PictureBook", &picture_book, &struct {
-            fn handler(obj: *Editorial, a: std.mem.Allocator, _: Request, w: *std.Io.Writer) anyerror!void {
-                var t = try zemplate.Template(Editorial).init(a, obj.*);
-                defer t.deinit();
-                const render = try t.render(@embedFile("editorial.html"), .{});
-                try w.writeAll(render);
-            }
-        }.handler),
-        try server.registerHypermediaEndpoint("/Sketch", &sketch, &struct {
-            fn handler(obj: *Editorial, a: std.mem.Allocator, _: Request, w: *std.Io.Writer) anyerror!void {
-                var t = try zemplate.Template(Editorial).init(a, obj.*);
-                defer t.deinit();
-                const render = try t.render(@embedFile("editorial.html"), .{});
-                try w.writeAll(render);
-            }
-        }.handler),
-        try server.registerHypermediaEndpoint("/Portraits", &portraits, &struct {
-            fn handler(obj: *Editorial, a: std.mem.Allocator, _: Request, w: *std.Io.Writer) anyerror!void {
-                var t = try zemplate.Template(Editorial).init(a, obj.*);
-                defer t.deinit();
-                const render = try t.render(@embedFile("editorial.html"), .{});
                 try w.writeAll(render);
             }
         }.handler),
