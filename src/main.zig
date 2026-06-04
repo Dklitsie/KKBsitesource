@@ -29,8 +29,14 @@ pub fn main() !void {
     var thumbnail_urls = try drive.getFilesMap(allocator);
     defer drive.deinitFilesMap(allocator, &thumbnail_urls);
 
-    const editorial_imgs = thumbnail_urls.get(@tagName(.editorial)).?;
+    const editorial_imgs = thumbnail_urls.get(@tagName(drive.ImageCategories.editorial)).?;
     var editorial = Editorial{ .image_items = editorial_imgs };
+    const picture_book_imgs = thumbnail_urls.get(@tagName(drive.ImageCategories.picture_book)).?;
+    var picture_book = Editorial{ .image_items = picture_book_imgs };
+    const sketch_imgs = thumbnail_urls.get(@tagName(drive.ImageCategories.sketch)).?;
+    var sketch = Editorial{ .image_items = sketch_imgs };
+    const portraits_imgs = thumbnail_urls.get(@tagName(drive.ImageCategories.portraits)).?;
+    var portraits = Editorial{ .image_items = portraits_imgs };
 
     var hydration_context = try zyph.hydration_middleware.Context.init(
         allocator,
@@ -63,6 +69,30 @@ pub fn main() !void {
         }.handler),
 
         try server.registerHypermediaEndpoint("/Editorial", &editorial, &struct {
+            fn handler(obj: *Editorial, a: std.mem.Allocator, _: Request, w: *std.Io.Writer) anyerror!void {
+                var t = try zemplate.Template(Editorial).init(a, obj.*);
+                defer t.deinit();
+                const render = try t.render(@embedFile("editorial.html"), .{});
+                try w.writeAll(render);
+            }
+        }.handler),
+        try server.registerHypermediaEndpoint("/PictureBook", &picture_book, &struct {
+            fn handler(obj: *Editorial, a: std.mem.Allocator, _: Request, w: *std.Io.Writer) anyerror!void {
+                var t = try zemplate.Template(Editorial).init(a, obj.*);
+                defer t.deinit();
+                const render = try t.render(@embedFile("editorial.html"), .{});
+                try w.writeAll(render);
+            }
+        }.handler),
+        try server.registerHypermediaEndpoint("/Sketch", &sketch, &struct {
+            fn handler(obj: *Editorial, a: std.mem.Allocator, _: Request, w: *std.Io.Writer) anyerror!void {
+                var t = try zemplate.Template(Editorial).init(a, obj.*);
+                defer t.deinit();
+                const render = try t.render(@embedFile("editorial.html"), .{});
+                try w.writeAll(render);
+            }
+        }.handler),
+        try server.registerHypermediaEndpoint("/Portraits", &portraits, &struct {
             fn handler(obj: *Editorial, a: std.mem.Allocator, _: Request, w: *std.Io.Writer) anyerror!void {
                 var t = try zemplate.Template(Editorial).init(a, obj.*);
                 defer t.deinit();

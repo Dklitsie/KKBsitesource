@@ -1,0 +1,83 @@
+<template id="drive-image-template">
+  <style>
+    img {
+      width: 240px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: transform 0.1s ease;
+    }
+
+    img:hover {
+      transform: scale(1.03);
+    }
+  </style>
+
+  <img id="thumb" />
+</template>
+
+<script>
+  function assertModalExists() {
+    const modal = document.getElementById('img-modal');
+    const img = document.getElementById('img-modal-content');
+
+    if (!modal || !img) {
+      throw new Error(
+        '[drive-image] Missing required modal elements:\n' +
+          'You must define:\n' +
+          '  <div id="img-modal">\n' +
+          '  <img id="img-modal-content" />\n',
+      );
+    }
+
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) closeModal();
+    });
+
+    return { modal, img };
+  }
+
+  function closeModal() {
+    const { modal, img } = assertModalExists();
+
+    modal.style.display = 'none';
+    img.src = '';
+  }
+
+  function openModal(url) {
+    const { modal, img } = assertModalExists();
+    img.src = url;
+    modal.style.display = 'flex';
+  }
+
+  class DriveImage extends HTMLElement {
+    constructor() {
+      super();
+
+      const template = document
+        .getElementById('drive-image-template')
+        .content.cloneNode(true);
+
+      this.attachShadow({ mode: 'open' }).appendChild(template);
+    }
+
+    connectedCallback() {
+      const id = this.getAttribute('id');
+      if (!id) {
+        throw new Error("[drive-image] Missing required 'id' attribute");
+      }
+
+      const thumb = this.shadowRoot.getElementById('thumb');
+
+      const thumbUrl = `https://drive.google.com/thumbnail?id=${id}`;
+      const largeUrl = `https://drive.google.com/thumbnail?id=${id}&sz=w2000`;
+
+      thumb.src = thumbUrl;
+
+      thumb.addEventListener('click', () => {
+        openModal(largeUrl);
+      });
+    }
+  }
+
+  customElements.define('drive-image', DriveImage);
+</script>

@@ -16,7 +16,7 @@ const DriveResponse = struct {
     files: []DriveFile,
 };
 
-const ImageCategories = enum {
+pub const ImageCategories = enum {
     picture_book,
     sketch,
     editorial,
