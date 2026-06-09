@@ -6,8 +6,8 @@ const zyph = @import("zyph");
 const Request = std.http.Server.Request;
 
 pub const std_options = std.Options{
-    .log_level = .debug,
-    // .log_level = .warn,
+    // .log_level = .debug,
+    .log_level = .warn,
 };
 
 const EmptyTemplate = zemplate.Template(@TypeOf(.{}));
