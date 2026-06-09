@@ -61,20 +61,19 @@
     }
 
     connectedCallback() {
-      const id = this.getAttribute('id');
-      if (!id) {
-        throw new Error("[drive-image] Missing required 'id' attribute");
+      const filepath = this.getAttribute('filepath');
+      if (!filepath) {
+        throw new Error("[drive-image] Missing required 'filepath' attribute");
       }
 
       const thumb = this.shadowRoot.getElementById('thumb');
 
-      const thumbUrl = `https://drive.google.com/thumbnail?id=${id}`;
-      const largeUrl = `https://drive.google.com/thumbnail?id=${id}&sz=w2000`;
+      const imgUrl = `imgs/${filepath}`;
 
-      thumb.src = thumbUrl;
+      thumb.src = imgUrl;
 
       thumb.addEventListener('click', () => {
-        openModal(largeUrl);
+        openModal(imgUrl);
       });
     }
   }

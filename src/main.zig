@@ -6,14 +6,14 @@ const zyph = @import("zyph");
 const Request = std.http.Server.Request;
 
 pub const std_options = std.Options{
-    // .log_level = .debug,
-    .log_level = .warn,
+    .log_level = .debug,
+    // .log_level = .warn,
 };
 
 const EmptyTemplate = zemplate.Template(@TypeOf(.{}));
 
 const ImagesPage = struct {
-    image_items: []const drive.DriveFile,
+    image_items: []const drive.FileHandle,
 };
 
 inline fn titleCase(comptime s: []const u8) [calcTitleCaseLen(s)]u8 {
@@ -47,19 +47,38 @@ pub fn main() !void {
     defer if (gpa.detectLeaks()) std.log.err("LEAKS DETECTED IN MAIN ALLOCATOR\n", .{});
 
     const allocator = gpa.allocator();
+    var env_map = try std.process.getEnvMap(allocator);
+    defer env_map.deinit();
+
     var server = zyph.Server.init(allocator, "serve");
     defer server.deinit();
 
-    var thumbnail_urls = try drive.getFilesMap(allocator);
+    var client, const auth_header = try drive.createClientAndAuthHeader(allocator);
+    defer client.deinit();
+    defer allocator.free(auth_header.override);
+    const drive_folder_id = env_map.get("FOLDER_ID") orelse @panic("No Folder Id");
+    var thumbnail_urls = try drive.getFilesMap(
+        allocator,
+        drive_folder_id,
+        &client,
+        auth_header,
+    );
     defer drive.deinitFilesMap(allocator, &thumbnail_urls);
 
-    const editorial_imgs = thumbnail_urls.get(@tagName(drive.ImageCategories.editorial)).?;
+    try drive.syncImages(allocator, &client, auth_header, &thumbnail_urls);
+
+    const editorial_imgs = thumbnail_urls.get(@tagName(drive.ImageCategory.editorial)).?;
+    for (editorial_imgs) |img| {
+        std.log.info(
+            \\file: {s} 
+        , .{img.filepath});
+    }
     var editorial = ImagesPage{ .image_items = editorial_imgs };
-    const picture_book_imgs = thumbnail_urls.get(@tagName(drive.ImageCategories.picture_book)).?;
+    const picture_book_imgs = thumbnail_urls.get(@tagName(drive.ImageCategory.picture_book)).?;
     var picture_book = ImagesPage{ .image_items = picture_book_imgs };
-    const sketch_imgs = thumbnail_urls.get(@tagName(drive.ImageCategories.sketch)).?;
+    const sketch_imgs = thumbnail_urls.get(@tagName(drive.ImageCategory.sketch)).?;
     var sketch = ImagesPage{ .image_items = sketch_imgs };
-    const portraits_imgs = thumbnail_urls.get(@tagName(drive.ImageCategories.portraits)).?;
+    const portraits_imgs = thumbnail_urls.get(@tagName(drive.ImageCategory.portraits)).?;
     var portraits = ImagesPage{ .image_items = portraits_imgs };
 
     var hydration_context = try zyph.hydration_middleware.Context.init(
@@ -73,7 +92,7 @@ pub fn main() !void {
         zyph.Middleware.init(.post, &hydration_context, &zyph.hydration_middleware.handler),
     );
 
-    inline for ([_]drive.ImageCategories{ .editorial, .picture_book, .portraits, .sketch }) |category| {
+    inline for ([_]drive.ImageCategory{ .editorial, .picture_book, .portraits, .sketch }) |category| {
         const page = switch (category) {
             .editorial => &editorial,
             .picture_book => &picture_book,
@@ -113,8 +132,6 @@ pub fn main() !void {
         try route_handler.addMiddlewares(.post, &.{zyph.hydration_middleware.NAME});
     }
 
-    var env_map = try std.process.getEnvMap(allocator);
-    defer env_map.deinit();
     const port_str = env_map.get("PORT") orelse "3000";
     const port = try std.fmt.parseInt(u16, port_str, 10);
     const addr = try std.net.Address.parseIp("0.0.0.0", port);

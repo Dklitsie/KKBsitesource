@@ -2,7 +2,7 @@
 
 # Google Drive Hosting
 All images are hosted in google drive, [here](https://console.cloud.google.com/welcome?project=active-cove-373120) is a link to the Drive API project.
-The service key is in `google-drive-service-key.json`, and the access token is obtained using `get-drive-token.sh`. 
+The service key is in `google-drive-service-key.json`(is on ezra's computer), and the access token is obtained using `get-drive-token.sh`. 
 Before the access token can be obtained, two things from the service key need to be in the environment: `PRIVATE_KEY`(private_key) and `CLIENT_EMAIL`(client_email). This is done by manually adding them to the environment before running `get-drive-token.sh`. It is done this way because in production, we can't just have the service-key file in the repository, so we'll keep it locally, but manually add these two env variables so we can still creaete a token on the server side. 
 
 easily set these: 
