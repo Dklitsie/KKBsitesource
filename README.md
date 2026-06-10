@@ -58,6 +58,6 @@ will contain an `order.txt` file
 
 
 ## TODO
-- [ ] Write parsers for `order.txt` and `info.txt`
+- [x] Write parsers for `order.txt` and `info.txt`
 - [ ] Pipeline improvements after the above
 - [ ] Create drive watcher
