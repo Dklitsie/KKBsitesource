@@ -28,25 +28,8 @@ pub fn build(b: *std.Build) void {
 
     // Executable used by github actions to dynamically create blogs metadata
 
-    const read_blog_data_module = b.createModule(.{
-        .root_source_file = b.path("tools/read_blog_posts_metadata.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    {
-        const exe = b.addExecutable(.{
-            .name = "read_blog_posts_metadata",
-            .root_module = read_blog_data_module,
-        });
-        b.installArtifact(exe);
-        const run_cmd = b.addRunArtifact(exe);
-        run_cmd.step.dependOn(b.getInstallStep());
-        const run_step = b.step("metadata", "get blogs metadata");
-        run_step.dependOn(&run_cmd.step);
-    }
-
     const exe = b.addExecutable(.{
-        .name = "zortfolio",
+        .name = "kkb",
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/main.zig"),
             .target = target,
@@ -54,12 +37,10 @@ pub fn build(b: *std.Build) void {
         }),
     });
 
-    exe.root_module.addImport("blog_metadata", read_blog_data_module);
     exe.root_module.addImport("zemplate", zemplate.module("zemplate"));
     exe.root_module.addImport("zyph", zyph.module("zyph"));
 
     embedPages(b, exe) catch @panic("failed to embed pages");
-    exe.root_module.addAnonymousImport("blogsMetadata.json", .{ .root_source_file = b.path("blogsMetadata.json") });
 
     b.installArtifact(exe);
 
@@ -83,6 +64,7 @@ pub fn build(b: *std.Build) void {
             .optimize = optimize,
         }),
     });
+    embedPages(b, exe_unit_tests) catch @panic("failed to embed pages");
     exe_unit_tests.root_module.addImport("zemplate", zemplate.module("zemplate"));
     exe_unit_tests.root_module.addImport("zyph", zyph.module("zyph"));
 

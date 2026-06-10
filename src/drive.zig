@@ -310,3 +310,156 @@ pub fn syncImages(
         thread.join();
     }
 }
+
+pub const Info = struct {
+    title: []const u8,
+    body: []const u8,
+};
+
+pub fn parseInfo(input: []const u8) !Info {
+    const title_prefix = "title:";
+    const body_prefix = "body:";
+
+    var lines = std.mem.splitScalar(u8, input, '\n');
+
+    const title_line = lines.next() orelse return error.MissingTitle;
+
+    if (!std.mem.startsWith(u8, title_line, title_prefix))
+        return error.ExpectedTitle;
+
+    const title = std.mem.trim(
+        u8,
+        title_line[title_prefix.len..],
+        " \t",
+    );
+
+    const body_line = lines.next() orelse return error.MissingBody;
+
+    if (!std.mem.startsWith(u8, body_line, body_prefix))
+        return error.ExpectedBody;
+
+    const body_offset =
+        std.mem.indexOf(u8, input, body_line).? +
+        body_prefix.len;
+
+    const body = std.mem.trimLeft(
+        u8,
+        input[body_offset..],
+        " \t",
+    );
+
+    return .{
+        .title = title,
+        .body = body,
+    };
+}
+
+pub const OrderEntry = struct {
+    filename: []const u8,
+    text: ?[]const u8,
+};
+
+pub fn parseOrder(
+    a: std.mem.Allocator,
+    input: []const u8,
+) ![]OrderEntry {
+    var lines = std.mem.splitScalar(u8, input, '\n');
+
+    var list = try std.ArrayList(OrderEntry).initCapacity(a, 16);
+    while (lines.next()) |line_raw| {
+        const line = std.mem.trim(u8, line_raw, " \t\r");
+        if (line.len == 0) continue;
+
+        var split = std.mem.splitScalar(u8, line, '-');
+        const split_first = split.first();
+        if (split.peek() != null) {
+            try list.append(a, OrderEntry{
+                .filename = std.mem.trim(u8, split_first, " \t"),
+                .text = std.mem.trim(u8, split.rest(), " \t"),
+            });
+        } else try list.append(a, OrderEntry{
+            .filename = line,
+            .text = null,
+        });
+    }
+
+    return try list.toOwnedSlice(a);
+}
+
+test "parseOrder" {
+    const Expected = struct {
+        filename: []const u8,
+        text: ?[]const u8,
+    };
+
+    const input =
+        \\StBenedict - Saint Benedict
+        \\Ezra - Ezra
+        \\VeryLong - Many words are in this entry. Even some punctuation! and what else? commas! ,,, and hyphens --- 
+        \\OtherPerson -Other Person
+        \\OtherPerson2-Some! Other Person
+        \\ThisOneHasNoText
+    ;
+
+    const expected = [_]Expected{
+        .{ .filename = "StBenedict", .text = "Saint Benedict" },
+        .{ .filename = "Ezra", .text = "Ezra" },
+        .{ .filename = "VeryLong", .text = "Many words are in this entry. Even some punctuation! and what else? commas! ,,, and hyphens ---" },
+        .{ .filename = "OtherPerson", .text = "Other Person" },
+        .{ .filename = "OtherPerson2", .text = "Some! Other Person" },
+        .{ .filename = "ThisOneHasNoText", .text = null },
+    };
+
+    const list = try parseOrder(
+        std.testing.allocator,
+        input,
+    );
+    defer std.testing.allocator.free(list);
+
+    for (expected, list) |exp, entry| {
+        try std.testing.expectEqualStrings(
+            exp.filename,
+            entry.filename,
+        );
+        if (exp.text) |text| {
+            try std.testing.expectEqualStrings(
+                text,
+                entry.text.?,
+            );
+        } else try std.testing.expectEqual(entry.text, null);
+    }
+
+    std.debug.print(
+        \\Test success!
+        \\
+    , .{});
+}
+
+test "parseInfo" {
+    const input =
+        \\title: Title!
+        \\body: Body text
+        \\is long
+        \\and multiple lines
+    ;
+
+    const info = try parseInfo(input);
+
+    try std.testing.expectEqualStrings(
+        "Title!",
+        info.title,
+    );
+
+    try std.testing.expectEqualStrings(
+        \\Body text
+        \\is long
+        \\and multiple lines
+    ,
+        info.body,
+    );
+
+    std.debug.print(
+        \\Test success!
+        \\
+    , .{});
+}

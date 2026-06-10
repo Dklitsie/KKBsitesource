@@ -68,11 +68,6 @@ pub fn main() !void {
     try drive.syncImages(allocator, &client, auth_header, &thumbnail_urls);
 
     const editorial_imgs = thumbnail_urls.get(@tagName(drive.ImageCategory.editorial)).?;
-    for (editorial_imgs) |img| {
-        std.log.info(
-            \\file: {s} 
-        , .{img.filepath});
-    }
     var editorial = ImagesPage{ .image_items = editorial_imgs };
     const picture_book_imgs = thumbnail_urls.get(@tagName(drive.ImageCategory.picture_book)).?;
     var picture_book = ImagesPage{ .image_items = picture_book_imgs };
