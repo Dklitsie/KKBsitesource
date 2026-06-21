@@ -5,7 +5,7 @@ RUN apt-get update && apt-get install -y curl xz-utils libc6-dev && \
     rm -rf /var/lib/apt/lists/*
 
 # Set up Zig
-ARG ZIGVER=0.15.1
+ARG ZIGVER=0.16.0
 WORKDIR /deps
 RUN curl -L https://ziglang.org/download/$ZIGVER/zig-x86_64-linux-$ZIGVER.tar.xz -o zig.tar.xz && \
     tar xf zig.tar.xz && \

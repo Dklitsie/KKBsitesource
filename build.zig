@@ -3,16 +3,16 @@ const log = std.log.scoped(.BUILD);
 
 const PAGES_DIR = "pages";
 
-pub fn embedPages(b: *std.Build, exe: *std.Build.Step.Compile) !void {
+pub fn embedPages(b: *std.Build, io: std.Io, exe: *std.Build.Step.Compile) !void {
     var arena_state = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena_state.deinit();
     const arena = arena_state.allocator();
 
-    const cwd = std.fs.cwd();
-    var dir = try cwd.openDir(PAGES_DIR, .{ .iterate = true });
+    const cwd = std.Io.Dir.cwd();
+    var dir = try cwd.openDir(io, PAGES_DIR, .{ .iterate = true });
     var it = dir.iterate();
 
-    while (try it.next()) |entry| {
+    while (try it.next(io)) |entry| {
         if (entry.kind != .file) continue;
         if (entry.name[0] == '.') continue;
         exe.root_module.addAnonymousImport(entry.name, .{ .root_source_file = b.path(try std.fmt.allocPrint(arena, "{s}/{s}", .{ PAGES_DIR, entry.name })) });
@@ -22,6 +22,9 @@ pub fn embedPages(b: *std.Build, exe: *std.Build.Step.Compile) !void {
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
+    var threaded: std.Io.Threaded = .init(b.allocator, .{});
+    defer threaded.deinit();
+    const io = threaded.io();
 
     const zemplate = b.dependency("zemplate", .{});
     const zyph = b.dependency("zyph", .{});
@@ -40,7 +43,7 @@ pub fn build(b: *std.Build) void {
     exe.root_module.addImport("zemplate", zemplate.module("zemplate"));
     exe.root_module.addImport("zyph", zyph.module("zyph"));
 
-    embedPages(b, exe) catch @panic("failed to embed pages");
+    embedPages(b, io, exe) catch @panic("failed to embed pages");
 
     b.installArtifact(exe);
 
@@ -64,7 +67,7 @@ pub fn build(b: *std.Build) void {
             .optimize = optimize,
         }),
     });
-    embedPages(b, exe_unit_tests) catch @panic("failed to embed pages");
+    embedPages(b, io, exe_unit_tests) catch @panic("failed to embed pages");
     exe_unit_tests.root_module.addImport("zemplate", zemplate.module("zemplate"));
     exe_unit_tests.root_module.addImport("zyph", zyph.module("zyph"));
 

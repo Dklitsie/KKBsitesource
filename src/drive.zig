@@ -25,93 +25,14 @@ pub const ImageCategory = enum {
 };
 
 const DRIVE_FOLDER_MIME = "application/vnd.google-apps.folder";
-const MimeOption = enum { folder, image };
+const MimeOption = enum { folder, image, text };
 
-fn getFolderFilesMatchingMime(
-    a: std.mem.Allocator,
-    client: *std.http.Client,
-    auth_header: std.http.Client.Request.Headers.Value,
-    folder_id: []const u8,
-    mime: MimeOption,
-) anyerror!std.json.Parsed(DriveResponse) {
-    const mime_str = try switch (mime) {
-        .folder => std.fmt.allocPrint(a, "+and+mimeType='{s}'", .{DRIVE_FOLDER_MIME}),
-        .image => std.fmt.allocPrint(a, "+and+mimeType+contains+'image/'", .{}),
-    };
-    defer a.free(mime_str);
-
-    const uri_str = try std.fmt.allocPrint(a,
-        \\https://www.googleapis.com/drive/v3/files?q='{s}'+in+parents{s}&fields=files(id,name,mimeType,kind)
-    , .{ folder_id, mime_str });
-    defer a.free(uri_str);
-    const uri = try std.Uri.parse(uri_str);
-    const headers = std.http.Client.Request.Headers{
-        .authorization = auth_header,
-        .accept_encoding = .{ .override = "identity" },
-    };
-
-    var req = try client.request(.GET, uri, .{
-        .headers = headers,
-        .redirect_behavior = .not_allowed,
-        .keep_alive = false,
-    });
-    defer req.deinit();
-
-    try req.sendBodiless();
-    var res = try req.receiveHead(&.{});
-
-    const response_transfer_buffer = try a.alloc(u8, 1024 * 1024);
-    defer a.free(response_transfer_buffer);
-
-    const body_reader = res.reader(response_transfer_buffer);
-    const res_body = try body_reader.allocRemaining(a, .unlimited);
-    defer a.free(res_body);
-    const status = res.head.status.class();
-    if (status == std.http.Status.Class.success) {
-        return try std.json.parseFromSlice(
-            DriveResponse,
-            a,
-            res_body,
-            .{
-                .ignore_unknown_fields = true,
-            },
-        );
-    }
-
-    log.err(
-        \\Error fetching folder
-        \\status: {s}
-        \\body: {s}
-    , .{ @tagName(status), res_body });
-    return error.StatusNotSuccess;
-}
-
-pub const FileHandle = struct {
-    id: []u8,
-    filepath: []u8,
-};
-
-// "https://drive.google.com/thumbnail?id=#{id}"
-pub fn deinitFilesMap(
-    a: std.mem.Allocator,
-    files_map: *std.StringHashMapUnmanaged([]FileHandle),
-) void {
-    var iter = files_map.valueIterator();
-    while (iter.next()) |files| {
-        for (files.*) |f| {
-            a.free(f.id);
-            a.free(f.filepath);
-        }
-    }
-    files_map.deinit(a);
-}
-
-pub fn getFilesMap(
+fn getFilesMap(
     a: std.mem.Allocator,
     folder_id: []const u8,
     client: *std.http.Client,
     authorization_header: std.http.Client.Request.Headers.Value,
-) anyerror!std.StringHashMapUnmanaged([]FileHandle) {
+) anyerror!FilesMap {
     const parsed = try getFolderFilesMatchingMime(
         a,
         client,
@@ -121,7 +42,7 @@ pub fn getFilesMap(
     );
     defer parsed.deinit();
 
-    var files_map = std.StringHashMapUnmanaged([]FileHandle){};
+    var files_map = FilesMap{};
 
     inline for ([_]ImageCategory{ .editorial, .picture_book, .portraits, .sketch }) |category| {
         const category_str = @tagName(category);
@@ -129,18 +50,49 @@ pub fn getFilesMap(
             if (std.mem.eql(u8, f.name, category_str)) {
                 std.debug.print("found {s}: {s}\n", .{ category_str, f.id });
 
-                const files = try getFolderFilesMatchingMime(a, client, authorization_header, f.id, .image);
-                defer files.deinit();
+                const image_files = try getFolderFilesMatchingMime(a, client, authorization_header, f.id, .image);
+                defer image_files.deinit();
+                const text_files = try getFolderFilesMatchingMime(a, client, authorization_header, f.id, .text);
+                defer text_files.deinit();
 
-                const file_handles = try a.alloc(FileHandle, files.value.files.len);
+                const image_file_handles = try a.alloc(FileHandle, image_files.value.files.len);
 
-                for (files.value.files, 0..) |file, i| {
-                    file_handles[i] = .{
+                for (image_files.value.files, 0..) |file, i| {
+                    image_file_handles[i] = .{
                         .id = try a.dupe(u8, file.id),
                         .filepath = try std.fmt.allocPrint(a, "{s}/{s}", .{ category_str, file.name }),
                     };
                 }
-                try files_map.put(a, category_str, file_handles);
+
+                var info: ?FileHandle = null;
+                var order: ?FileHandle = null;
+                for (text_files.value.files) |text_file| {
+                    const lowername = try std.ascii.allocLowerString(a, text_file.name);
+                    defer a.free(lowername);
+
+                    if (std.mem.containsAtLeast(u8, lowername, 1, "order")) {
+                        order = .{
+                            .id = try a.dupe(u8, text_file.id),
+                            .filepath = try std.fmt.allocPrint(a, "{s}/{s}", .{ category_str, text_file.name }),
+                        };
+                    } else if (std.mem.containsAtLeast(u8, lowername, 1, "info")) {
+                        info = .{
+                            .id = try a.dupe(u8, text_file.id),
+                            .filepath = try std.fmt.allocPrint(a, "{s}/{s}", .{ category_str, text_file.name }),
+                        };
+                    } else {
+                        log.err(
+                            \\ Encountered unexpected text file: '{s}'
+                        , .{text_file.name});
+                    }
+                }
+
+                const folder_files = FolderFiles{
+                    .image_files = image_file_handles,
+                    .info = info,
+                    .order = order,
+                };
+                try files_map.put(a, category_str, folder_files);
             }
         }
     }
@@ -148,19 +100,18 @@ pub fn getFilesMap(
     return files_map;
 }
 
+/// Runs a bash script to get access token
 /// make sure to free authorization_header.override
-pub fn createClientAndAuthHeader(a: std.mem.Allocator) anyerror!struct { std.http.Client, std.http.Client.Request.Headers.Value } {
-    var env_map = try std.process.getEnvMap(a);
-    defer env_map.deinit();
-
-    const result = try std.process.Child.run(.{
-        .allocator = a,
+pub fn createClientAndAuthHeader(a: std.mem.Allocator, io: std.Io) anyerror!struct { std.http.Client, std.http.Client.Request.Headers.Value } {
+    const result = try std.process.spawn(io, .{
         .argv = &.{ "/bin/bash", "get-drive-token.sh" },
-        .env_map = &env_map,
+        .stdout = .pipe,
     });
-    defer a.free(result.stdout);
-    defer a.free(result.stderr);
-    const access_token = std.mem.trim(u8, result.stdout, "\n");
+    const stdout = result.stdout.?;
+    var reader = stdout.reader(io, &.{});
+    const stdout_txt = try reader.interface.allocRemaining(a, .unlimited);
+
+    const access_token = std.mem.trim(u8, stdout_txt, "\n");
     log.warn("Access Token: {s}", .{access_token});
 
     // const access_token = env_map.get("ACCESS_TOKEN") orelse @panic("No Access Token");
@@ -170,6 +121,7 @@ pub fn createClientAndAuthHeader(a: std.mem.Allocator) anyerror!struct { std.htt
 
     const client = std.http.Client{
         .allocator = a,
+        .io = io,
         // must be explicitly set to avoid an indefinte hang
         .write_buffer_size = 1024 * 32,
     };
@@ -178,6 +130,7 @@ pub fn createClientAndAuthHeader(a: std.mem.Allocator) anyerror!struct { std.htt
 
 const SyncContext = struct {
     allocator: std.mem.Allocator,
+    io: std.Io,
     client: *std.http.Client,
     auth_header: std.http.Client.Request.Headers.Value,
 
@@ -190,8 +143,9 @@ const WorkItem = struct {
     file: DriveFile,
 };
 
-fn downloadFile(
+fn downloadImageFile(
     a: std.mem.Allocator,
+    io: std.Io,
     client: *std.http.Client,
     auth_header: std.http.Client.Request.Headers.Value,
     file_handle: FileHandle,
@@ -203,8 +157,9 @@ fn downloadFile(
     );
     defer a.free(output_path);
 
+    const cwd = std.Io.Dir.cwd();
     // Skip existing files.
-    std.fs.cwd().access(output_path, .{}) catch {
+    cwd.access(io, output_path, .{}) catch {
         var parent_dir = std.mem.splitScalar(u8, file_handle.filepath, '/');
         const dir_path = try std.fmt.allocPrint(
             a,
@@ -213,7 +168,7 @@ fn downloadFile(
         );
         defer a.free(dir_path);
 
-        try std.fs.cwd().makePath(dir_path);
+        try cwd.createDirPath(io, dir_path);
 
         const uri_str = try std.fmt.allocPrint(
             a,
@@ -258,20 +213,63 @@ fn downloadFile(
             return error.DownloadFailed;
         }
 
-        var out = try std.fs.cwd().createFile(output_path, .{});
-        defer out.close();
+        var out = try cwd.createFile(io, output_path, .{});
+        defer out.close(io);
 
-        try out.writeAll(body);
+        try out.writeStreamingAll(io, body);
 
         log.info("downloaded {s}", .{output_path});
     };
 }
 
-fn worker(ctx: *SyncContext) !void {
+fn fetchTextContent(
+    a: std.mem.Allocator,
+    client: *std.http.Client,
+    auth_header: std.http.Client.Request.Headers.Value,
+    file_handle: FileHandle,
+) ![]u8 {
+    const uri_str = try std.fmt.allocPrint(
+        a,
+        "https://www.googleapis.com/drive/v3/files/{s}?alt=media",
+        .{file_handle.id},
+    );
+    defer a.free(uri_str);
+
+    const uri = try std.Uri.parse(uri_str);
+
+    const headers = std.http.Client.Request.Headers{
+        .authorization = auth_header,
+        .accept_encoding = .{ .override = "identity" },
+    };
+
+    var req = try client.request(.GET, uri, .{
+        .headers = headers,
+        .redirect_behavior = .not_allowed,
+        .keep_alive = false,
+    });
+    defer req.deinit();
+
+    log.info(
+        \\fetching: {s} 
+    , .{file_handle.filepath});
+    try req.sendBodiless();
+
+    var res = try req.receiveHead(&.{});
+
+    const transfer_buffer = try a.alloc(u8, 1024 * 1024);
+    defer a.free(transfer_buffer);
+
+    const reader = res.reader(transfer_buffer);
+    const body = try reader.allocRemaining(a, .unlimited);
+    return body;
+}
+
+fn imageSyncWorker(ctx: *SyncContext) !void {
     defer ctx.allocator.destroy(ctx);
     for (ctx.files) |file| {
-        try downloadFile(
+        try downloadImageFile(
             ctx.allocator,
+            ctx.io,
             ctx.client,
             ctx.auth_header,
             file,
@@ -279,38 +277,245 @@ fn worker(ctx: *SyncContext) !void {
     }
 }
 
-/// spawns one thread per category
-pub fn syncImages(
-    allocator: std.mem.Allocator,
+fn getFolderFilesMatchingMime(
+    a: std.mem.Allocator,
     client: *std.http.Client,
     auth_header: std.http.Client.Request.Headers.Value,
-    files_map: *const std.StringHashMapUnmanaged([]FileHandle),
-) anyerror!void {
-    const threads = try allocator.alloc(std.Thread, std.meta.tags(ImageCategory).len);
-    defer allocator.free(threads);
+    folder_id: []const u8,
+    mime: MimeOption,
+) anyerror!std.json.Parsed(DriveResponse) {
+    const mime_str = try switch (mime) {
+        .folder => std.fmt.allocPrint(a, "+and+mimeType='{s}'", .{DRIVE_FOLDER_MIME}),
+        .image => std.fmt.allocPrint(a, "+and+mimeType+contains+'image/'", .{}),
+        .text => std.fmt.allocPrint(a, "+and+mimeType='text/plain'", .{}),
+    };
+    defer a.free(mime_str);
 
-    for (threads, std.meta.tags(ImageCategory)) |*thread, category| {
-        const ctx = try allocator.create(SyncContext);
+    const uri_str = try std.fmt.allocPrint(a,
+        \\https://www.googleapis.com/drive/v3/files?q='{s}'+in+parents{s}&fields=files(id,name,mimeType,kind)
+    , .{ folder_id, mime_str });
+    defer a.free(uri_str);
+    const uri = try std.Uri.parse(uri_str);
+    const headers = std.http.Client.Request.Headers{
+        .authorization = auth_header,
+        .accept_encoding = .{ .override = "identity" },
+    };
 
-        ctx.* = .{
-            .allocator = allocator,
-            .client = client,
-            .auth_header = auth_header,
-            .files = files_map.get(@tagName(category)).?,
-            .category = category,
-        };
-        thread.* = try std.Thread.spawn(
-            .{},
-            worker,
-            .{ctx},
+    var req = try client.request(.GET, uri, .{
+        .headers = headers,
+        .redirect_behavior = .not_allowed,
+        .keep_alive = false,
+    });
+    defer req.deinit();
+
+    try req.sendBodiless();
+    var res = try req.receiveHead(&.{});
+
+    const response_transfer_buffer = try a.alloc(u8, 1024 * 1024);
+    defer a.free(response_transfer_buffer);
+
+    const body_reader = res.reader(response_transfer_buffer);
+    const res_body = try body_reader.allocRemaining(a, .unlimited);
+    defer a.free(res_body);
+    const status = res.head.status.class();
+    if (status == std.http.Status.Class.success) {
+        return try std.json.parseFromSlice(
+            DriveResponse,
+            a,
+            res_body,
+            .{
+                .ignore_unknown_fields = true,
+            },
         );
     }
 
-    for (threads) |thread| {
-        thread.join();
-    }
+    log.err(
+        \\Error fetching folder at '{s}'
+        \\status: {s}
+        \\body: {s}
+    , .{ uri_str, @tagName(status), res_body });
+    return error.StatusNotSuccess;
 }
 
+pub const FileHandle = struct {
+    id: []u8,
+    filepath: []u8,
+};
+
+const FilesMap = std.StringHashMapUnmanaged(FolderFiles);
+/// This struct should not be deinitialized
+/// Instead, ownership of image_files is passed to CategoryData
+const FolderFiles = struct {
+    image_files: []FileHandle,
+    info: ?FileHandle,
+    order: ?FileHandle,
+};
+
+const ImageItem = struct { file: FileHandle, text: ?[]const u8 };
+
+pub const CategoryPageTemplate = struct {
+    image_items: []const ImageItem,
+    info: ?Info,
+};
+
+pub const CategoryData = struct {
+    image_files: []FileHandle,
+    info: ?Info,
+    order: ?[]OrderEntry,
+
+    pub const Map = std.StringHashMapUnmanaged(CategoryData);
+
+    pub fn deinit(self: *@This(), a: std.mem.Allocator) void {
+        for (self.image_files) |f| {
+            a.free(f.id);
+            a.free(f.filepath);
+        }
+        a.free(self.image_files);
+        if (self.order) |order| a.free(order);
+    }
+
+    pub fn buildMap(
+        a: std.mem.Allocator,
+        client: *std.http.Client,
+        auth_header: std.http.Client.Request.Headers.Value,
+        outermost_folder_id: []const u8,
+    ) !Map {
+        var files_map = try getFilesMap(
+            a,
+            outermost_folder_id,
+            client,
+            auth_header,
+        );
+        defer files_map.deinit(a);
+
+        var result = std.StringHashMapUnmanaged(CategoryData){};
+
+        var iter = files_map.iterator();
+        while (iter.next()) |entry| {
+            const folder_files = entry.value_ptr;
+
+            var info: ?Info = null;
+            var order: ?[]OrderEntry = null;
+
+            if (folder_files.info) |handle| {
+                const raw = try fetchTextContent(a, client, auth_header, handle);
+                defer a.free(raw);
+                info = try parseInfo(raw);
+            }
+
+            if (folder_files.order) |handle| {
+                const raw = try fetchTextContent(a, client, auth_header, handle);
+                defer a.free(raw);
+                order = try parseOrder(a, raw);
+            }
+
+            try result.put(a, entry.key_ptr.*, .{
+                .info = info,
+                .order = order,
+                .image_files = folder_files.image_files,
+            });
+        }
+
+        return result;
+    }
+
+    pub fn syncImages(
+        allocator: std.mem.Allocator,
+        io: std.Io,
+        client: *std.http.Client,
+        auth_header: std.http.Client.Request.Headers.Value,
+        category_map: *const Map,
+    ) anyerror!void {
+        const threads = try allocator.alloc(std.Thread, std.meta.tags(ImageCategory).len);
+        defer allocator.free(threads);
+
+        for (threads, std.meta.tags(ImageCategory)) |*thread, category| {
+            const ctx = try allocator.create(SyncContext);
+
+            ctx.* = .{
+                .allocator = allocator,
+                .io = io,
+                .client = client,
+                .auth_header = auth_header,
+                .files = category_map.get(@tagName(category)).?.image_files,
+                .category = category,
+            };
+            thread.* = try std.Thread.spawn(
+                .{},
+                imageSyncWorker,
+                .{ctx},
+            );
+        }
+
+        for (threads) |thread| {
+            thread.join();
+        }
+    }
+
+    pub fn createOrderedTemplates(
+        a: std.mem.Allocator,
+        map: *const Map,
+    ) !std.StringHashMapUnmanaged(CategoryPageTemplate) {
+        var templates = std.StringHashMapUnmanaged(CategoryPageTemplate){};
+
+        var iter = map.iterator();
+        while (iter.next()) |entry| {
+            const cat = entry.key_ptr;
+            const category_data = entry.value_ptr;
+            const image_files = category_data.image_files;
+            const ordered: []ImageItem = if (category_data.order) |order| blk: {
+                var result = try std.ArrayList(ImageItem).initCapacity(a, order.len);
+                for (order) |o_entry| {
+                    const matched = for (image_files) |fh| {
+                        const stem = if (std.mem.lastIndexOfScalar(u8, fh.filepath, '/')) |slash|
+                            fh.filepath[slash + 1 ..]
+                        else
+                            fh.filepath;
+                        const bare = if (std.mem.lastIndexOfScalar(u8, stem, '.')) |dot|
+                            stem[0..dot]
+                        else
+                            stem;
+                        if (std.mem.eql(u8, bare, o_entry.filename)) break fh;
+                    } else {
+                        log.warn("order entry '{s}' has no matching image, skipping", .{o_entry.filename});
+                        continue;
+                    };
+                    try result.append(a, .{
+                        .file = matched,
+                        .text = o_entry.text,
+                    });
+                }
+                break :blk try result.toOwnedSlice(a);
+            } else unordered: {
+                var result = try std.ArrayList(ImageItem).initCapacity(a, image_files.len);
+                for (image_files) |fh|
+                    try result.append(a, .{ .file = fh, .text = null });
+                break :unordered try result.toOwnedSlice(a);
+            };
+
+            try templates.put(a, cat.*, .{
+                .image_items = ordered,
+                .info = category_data.info,
+            });
+        }
+
+        return templates;
+    }
+};
+
+// "https://drive.google.com/thumbnail?id=#{id}"
+// pub fn deinitFilesMap(
+//     a: std.mem.Allocator,
+//     files_map: *FilesMap,
+// ) void {
+//     var iter = files_map.valueIterator();
+//     while (iter.next()) |files|
+//         files.deinit(a);
+
+//     files_map.deinit(a);
+// }
+
+/// spawns one thread per category
 pub const Info = struct {
     title: []const u8,
     body: []const u8,
@@ -342,7 +547,7 @@ pub fn parseInfo(input: []const u8) !Info {
         std.mem.indexOf(u8, input, body_line).? +
         body_prefix.len;
 
-    const body = std.mem.trimLeft(
+    const body = std.mem.trimStart(
         u8,
         input[body_offset..],
         " \t",
@@ -415,7 +620,6 @@ test "parseOrder" {
         input,
     );
     defer std.testing.allocator.free(list);
-
     for (expected, list) |exp, entry| {
         try std.testing.expectEqualStrings(
             exp.filename,
