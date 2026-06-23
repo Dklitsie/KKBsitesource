@@ -6,8 +6,11 @@ const zyph = @import("zyph");
 const Request = std.http.Server.Request;
 
 pub const std_options = std.Options{
-    // .log_level = .debug,
-    .log_level = .warn,
+    .log_level = .debug,
+    .log_scope_levels = &.{
+        .{ .scope = .Lexer, .level = .warn },
+        .{ .scope = .Scope, .level = .warn },
+    },
 };
 
 const EmptyTemplate = zemplate.Template(@TypeOf(.{}));
@@ -46,24 +49,16 @@ pub fn main(init: std.process.Init) !void {
     defer client.deinit();
     defer allocator.free(auth_header.override);
     const drive_folder_id = init.environ_map.get("FOLDER_ID") orelse @panic("No Folder Id");
-    var category_data = try drive.CategoryData.buildMap(allocator, &client, auth_header, drive_folder_id);
+
+    var category_data = try drive.CategoryData.build(allocator, init.io, &client, auth_header, drive_folder_id);
     defer category_data.deinit(allocator);
+    try category_data.syncImages(allocator, init.io, auth_header);
 
-    try drive.CategoryData.syncImages(allocator, init.io, &client, auth_header, &category_data);
-    const templates = try drive.CategoryData.createOrderedTemplates(allocator, &category_data);
-
-    // var files_map = try drive.getFilesMap(
-    //     allocator,
-    //     drive_folder_id,
-    //     &client,
-    //     auth_header,
-    // );
-    // defer drive.deinitFilesMap(allocator, &files_map);
-
-    // try drive.syncImages(allocator, &client, auth_header, &files_map);
+    var templates = try category_data.createOrderedTemplates(allocator);
+    defer templates.deinit(allocator);
 
     var editorial = templates.get(@tagName(drive.ImageCategory.editorial)).?;
-    var picture_book = templates.get(@tagName(drive.ImageCategory.picture_book)).?;
+    var unpub_illustration = templates.get(@tagName(drive.ImageCategory.unpub_illustration)).?;
     var sketch = templates.get(@tagName(drive.ImageCategory.sketch)).?;
     var portraits = templates.get(@tagName(drive.ImageCategory.portraits)).?;
 
@@ -79,16 +74,16 @@ pub fn main(init: std.process.Init) !void {
         zyph.Middleware.init(.post, &hydration_context, &zyph.hydration_middleware.handler),
     );
 
-    inline for ([_]drive.ImageCategory{ .editorial, .picture_book, .portraits, .sketch }) |category| {
+    inline for ([_]drive.ImageCategory{ .editorial, .unpub_illustration, .portraits, .sketch }) |category| {
         const page = switch (category) {
             .editorial => &editorial,
-            .picture_book => &picture_book,
+            .unpub_illustration => &unpub_illustration,
             .portraits => &portraits,
             .sketch => &sketch,
         };
         const handler = try server.registerHypermediaEndpoint("/" ++ titleCase(@tagName(category)), page, &struct {
-            fn handler(obj: *drive.CategoryPageTemplate, a: std.mem.Allocator, _: Request, w: *std.Io.Writer) anyerror!void {
-                var t = try zemplate.Template(drive.CategoryPageTemplate).init(a, obj.*);
+            fn handler(obj: *drive.PageZemplate, a: std.mem.Allocator, _: Request, w: *std.Io.Writer) anyerror!void {
+                var t = try zemplate.Template(drive.PageZemplate).init(a, obj.*);
                 defer t.deinit();
                 const render = try t.render(@embedFile(@tagName(category) ++ ".html"), .{});
                 try w.writeAll(render);

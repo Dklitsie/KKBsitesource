@@ -1,0 +1,20 @@
+<div>
+  ||zz for .collections zz||
+  <!---->
+  ||zz if .template zz||
+  ||zz if .info.title zz||
+  <h1>{| . |}</h1>
+  ||zz endif zz||
+  <!---->
+  ||zz if .info.body zz||
+  <p>{| . |}</p>
+  ||zz endif zz||
+  <!---->
+  ||zz endif zz||
+  <!---->
+  ||zz for .image_items zz||
+  <drive-image filepath="{|.file.filepath|}"> </drive-image>
+  ||zz endfor zz||
+  <!---->
+  ||zz endfor zz||
+</div>

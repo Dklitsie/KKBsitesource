@@ -8,7 +8,4 @@ tmp/
 ssl-bundle/
 local_ssl/
 google-drive-service-key.json
-serve/imgs/picture_book/
-serve/imgs/portraits/
-serve/imgs/sketch/
-serve/imgs/editorial/
+serve/drive/
