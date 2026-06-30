@@ -1,5 +1,4 @@
 <div>
-  ||zz for .collections zz||
   <!---->
   ||zz if .template zz||
   ||zz if .info.title zz||
@@ -12,9 +11,20 @@
   <!---->
   ||zz endif zz||
   <!---->
-  ||zz for .image_items zz||
+  ||zz if .images zz||
+  <!---->
+  ||zz for . zz||
   <drive-image filepath="{|.file.filepath|}"> </drive-image>
   ||zz endfor zz||
   <!---->
+  ||zz endif zz||
+  <!---->
+  ||zz if .collections zz||
+  <!---->
+  ||zz for . zz||
+  <h1>{|.handle.filepath|}</h1>
   ||zz endfor zz||
+  <!---->
+  ||zz endif zz||
+  <!---->
 </div>

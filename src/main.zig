@@ -1,7 +1,8 @@
 const std = @import("std");
 const zap = @import("zap");
 const zemplate = @import("zemplate");
-const drive = @import("drive.zig");
+const drive = @import("drive/root.zig");
+
 const zyph = @import("zyph");
 const Request = std.http.Server.Request;
 
@@ -9,6 +10,7 @@ pub const std_options = std.Options{
     .log_level = .debug,
     .log_scope_levels = &.{
         .{ .scope = .Lexer, .level = .warn },
+        .{ .scope = .render, .level = .warn },
         .{ .scope = .Scope, .level = .warn },
     },
 };
@@ -40,27 +42,81 @@ inline fn calcTitleCaseLen(comptime s: []const u8) usize {
 }
 
 pub fn main(init: std.process.Init) !void {
-    const allocator = init.arena.allocator();
+    const allocator = init.gpa;
 
     var server = zyph.Server.init(allocator, init.io, "serve");
     defer server.deinit();
 
-    var client, const auth_header = try drive.createClientAndAuthHeader(allocator, init.io);
+    var client, const auth_header = try drive.remote.createClientAndAuthHeader(allocator, init.io, &(init.environ_map.*));
     defer client.deinit();
     defer allocator.free(auth_header.override);
-    const drive_folder_id = init.environ_map.get("FOLDER_ID") orelse @panic("No Folder Id");
 
-    var category_data = try drive.CategoryData.build(allocator, init.io, &client, auth_header, drive_folder_id);
-    defer category_data.deinit(allocator);
-    try category_data.syncImages(allocator, init.io, auth_header);
+    var drive_remote = try drive.remote.getRemoteCollections(
+        allocator,
+        &client,
+        auth_header,
+    );
+    // defer drive_remote.deinit(allocator);
+    std.log.debug(
+        \\ created full files table
+    , .{});
 
-    var templates = try category_data.createOrderedTemplates(allocator);
-    defer templates.deinit(allocator);
+    var diff = try drive.local.diffRemoteCollections(allocator, init.io, &drive_remote);
+    defer diff.deinit(allocator);
 
-    var editorial = templates.get(@tagName(drive.ImageCategory.editorial)).?;
-    var unpub_illustration = templates.get(@tagName(drive.ImageCategory.unpub_illustration)).?;
-    var sketch = templates.get(@tagName(drive.ImageCategory.sketch)).?;
-    var portraits = templates.get(@tagName(drive.ImageCategory.portraits)).?;
+    for (diff.to_delete.items) |path| {
+        std.Io.Dir.cwd().deleteFile(init.io, path) catch {};
+    }
+
+    try drive.remote.downloadFiles(
+        allocator,
+        auth_header,
+        diff.to_download.items,
+        8,
+    );
+
+    var drive_local = drive.local.getLocalCollections(allocator, init.io, drive_remote);
+    defer drive_local.deinit(allocator);
+
+    inline for (drive.ImageCategory.ALL_VARIANTS) |cat| {
+        std.log.warn(
+            \\ Category: {s}
+            \\ Handle:
+            \\ filepath: {s}
+        , .{
+            @tagName(cat),
+            drive_local.getFieldConst(cat).*.handle.filepath,
+            // drive_local.getFieldConst(cat).*.handle,
+        });
+    }
+    var templates = try drive.templates.AllTemplates.createAllTemplates(allocator, drive_local);
+
+    inline for (drive.ImageCategory.ALL_VARIANTS) |cat| {
+        const T = switch (cat) {
+            .editorial => drive.templates.Editorials,
+            else => continue,
+            // .portraits => @ptrCast(templates.portraits),
+            // .sketch => @ptrCast(templates.sketch),
+            // .unpublished => @ptrCast(templates.unpublished),
+        };
+        const inst: *anyopaque = switch (cat) {
+            .editorial => @ptrCast(&templates.editorials),
+            else => continue,
+            // .portraits => @ptrCast(templates.portraits),
+            // .sketch => @ptrCast(templates.sketch),
+            // .unpublished => @ptrCast(templates.unpublished),
+        };
+
+        const handler = try server.registerHypermediaEndpoint("/" ++ titleCase(@tagName(cat)), inst, &struct {
+            fn handler(obj: *T, a: std.mem.Allocator, _: Request, w: *std.Io.Writer) anyerror!void {
+                var t = try zemplate.Template(T).init(a, obj.*);
+                defer t.deinit();
+                const render = try t.render(@embedFile(@tagName(cat) ++ ".html"), .{});
+                try w.writeAll(render);
+            }
+        }.handler);
+        try handler.addMiddlewares(.post, &.{zyph.hydration_middleware.NAME});
+    }
 
     var hydration_context = try zyph.hydration_middleware.Context.init(
         allocator,
@@ -73,24 +129,6 @@ pub fn main(init: std.process.Init) !void {
         zyph.hydration_middleware.NAME,
         zyph.Middleware.init(.post, &hydration_context, &zyph.hydration_middleware.handler),
     );
-
-    inline for ([_]drive.ImageCategory{ .editorial, .unpub_illustration, .portraits, .sketch }) |category| {
-        const page = switch (category) {
-            .editorial => &editorial,
-            .unpub_illustration => &unpub_illustration,
-            .portraits => &portraits,
-            .sketch => &sketch,
-        };
-        const handler = try server.registerHypermediaEndpoint("/" ++ titleCase(@tagName(category)), page, &struct {
-            fn handler(obj: *drive.PageZemplate, a: std.mem.Allocator, _: Request, w: *std.Io.Writer) anyerror!void {
-                var t = try zemplate.Template(drive.PageZemplate).init(a, obj.*);
-                defer t.deinit();
-                const render = try t.render(@embedFile(@tagName(category) ++ ".html"), .{});
-                try w.writeAll(render);
-            }
-        }.handler);
-        try handler.addMiddlewares(.post, &.{zyph.hydration_middleware.NAME});
-    }
 
     for (&[_]zyph.Server.RouteHandler{
         try server.registerHypermediaEndpoint("/", &.{}, &struct {

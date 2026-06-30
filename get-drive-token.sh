@@ -3,7 +3,7 @@ set -euo pipefail
 
 
 PRIVATE_KEY_FILE=$(mktemp)
-echo "$PRIVATE_KEY" > "$PRIVATE_KEY_FILE"
+echo "$PRIVATE_KEY_B64" | base64 -d > "$PRIVATE_KEY_FILE"
 
 NOW=$(date +%s)
 EXP=$((NOW + 3600))

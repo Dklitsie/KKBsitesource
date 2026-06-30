@@ -2,20 +2,29 @@ const std = @import("std");
 const log = std.log.scoped(.BUILD);
 
 const PAGES_DIR = "pages";
+const PARTIALS_DIR = "partials";
 
-pub fn embedPages(b: *std.Build, io: std.Io, exe: *std.Build.Step.Compile) !void {
+pub fn embedHtml(
+    b: *std.Build,
+    io: std.Io,
+    exe: *std.Build.Step.Compile,
+    path: []const u8,
+) !void {
     var arena_state = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena_state.deinit();
     const arena = arena_state.allocator();
 
     const cwd = std.Io.Dir.cwd();
-    var dir = try cwd.openDir(io, PAGES_DIR, .{ .iterate = true });
+    var dir = try cwd.openDir(io, path, .{ .iterate = true });
     var it = dir.iterate();
 
     while (try it.next(io)) |entry| {
         if (entry.kind != .file) continue;
         if (entry.name[0] == '.') continue;
-        exe.root_module.addAnonymousImport(entry.name, .{ .root_source_file = b.path(try std.fmt.allocPrint(arena, "{s}/{s}", .{ PAGES_DIR, entry.name })) });
+        exe.root_module.addAnonymousImport(entry.name, .{ .root_source_file = b.path(try std.fmt.allocPrint(arena, "{s}/{s}", .{
+            path,
+            entry.name,
+        })) });
     }
 }
 
@@ -43,11 +52,13 @@ pub fn build(b: *std.Build) void {
     exe.root_module.addImport("zemplate", zemplate.module("zemplate"));
     exe.root_module.addImport("zyph", zyph.module("zyph"));
 
-    embedPages(b, io, exe) catch @panic("failed to embed pages");
+    embedHtml(b, io, exe, PAGES_DIR) catch @panic("failed to embed pages");
+    embedHtml(b, io, exe, PARTIALS_DIR) catch @panic("failed to embed pages");
 
     b.installArtifact(exe);
 
     const run_cmd = b.addRunArtifact(exe);
+
     @import("btzdotenv").loadDotEnv(run_cmd);
 
     run_cmd.step.dependOn(b.getInstallStep());
@@ -67,7 +78,8 @@ pub fn build(b: *std.Build) void {
             .optimize = optimize,
         }),
     });
-    embedPages(b, io, exe_unit_tests) catch @panic("failed to embed pages");
+    embedHtml(b, io, exe_unit_tests, PAGES_DIR) catch @panic("failed to embed pages");
+    embedHtml(b, io, exe_unit_tests, PARTIALS_DIR) catch @panic("failed to embed pages");
     exe_unit_tests.root_module.addImport("zemplate", zemplate.module("zemplate"));
     exe_unit_tests.root_module.addImport("zyph", zyph.module("zyph"));
 

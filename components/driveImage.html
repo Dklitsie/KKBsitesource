@@ -23,9 +23,9 @@
     if (!modal || !img) {
       throw new Error(
         '[drive-image] Missing required modal elements:\n' +
-          'You must define:\n' +
-          '  <div id="img-modal">\n' +
-          '  <img id="img-modal-content" />\n',
+        'You must define:\n' +
+        '  <div id="img-modal">\n' +
+        '  <img id="img-modal-content" />\n',
       );
     }
 
@@ -33,18 +33,18 @@
       if (e.target === modal) closeModal();
     });
 
-    return { modal, img };
+    return {modal, img};
   }
 
   function closeModal() {
-    const { modal, img } = assertModalExists();
+    const {modal, img} = assertModalExists();
 
     modal.style.display = 'none';
     img.src = '';
   }
 
   function openModal(url) {
-    const { modal, img } = assertModalExists();
+    const {modal, img} = assertModalExists();
     img.src = url;
     modal.style.display = 'flex';
   }
@@ -57,7 +57,7 @@
         .getElementById('drive-image-template')
         .content.cloneNode(true);
 
-      this.attachShadow({ mode: 'open' }).appendChild(template);
+      this.attachShadow({mode: 'open'}).appendChild(template);
     }
 
     connectedCallback() {
@@ -68,7 +68,7 @@
 
       const thumb = this.shadowRoot.getElementById('thumb');
 
-      const imgUrl = `drive/${filepath}`;
+      const imgUrl = `${filepath.slice("serve/".length)}`;
 
       thumb.src = imgUrl;
 
