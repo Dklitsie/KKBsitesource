@@ -9,7 +9,7 @@ pub const LocalCollection = struct {
     // remote should have this pattern rather than child
     images: ?[]ImageItem,
     collections: ?[]CollectionItem,
-    template: ?root.CollectionTemplate,
+    template: root.CollectionTemplate,
 
     pub fn deinit(self: *@This(), a: std.mem.Allocator) void {
         self.handle.deinit(a);
@@ -21,30 +21,39 @@ pub const LocalCollection = struct {
             defer a.free(imgs);
         }
 
-        if (self.template) |*t| t.deinit(a);
+        self.template.deinit(a);
     }
 
     pub fn fromRemote(a: std.mem.Allocator, io: std.Io, remote: root.remote.RemoteCollection) !@This() {
         log.warn(
             \\ creating local collection from remote: {s}
         , .{remote.handle.filepath});
-        var template: ?root.CollectionTemplate = null;
-        if (remote.template) |tmp| {
-            const file = try std.Io.Dir.cwd().openFile(io, tmp.filepath, .{});
-            defer file.close(io);
-            const transfer_buffer = try a.alloc(u8, 1024 * 1024);
-            defer a.free(transfer_buffer);
-            var reader = file.reader(io, transfer_buffer);
+        const template = blk: {
+            if (remote.template) |tmp| {
+                const file = try std.Io.Dir.cwd().openFile(io, tmp.filepath, .{});
+                defer file.close(io);
+                const transfer_buffer = try a.alloc(u8, 1024 * 1024);
+                defer a.free(transfer_buffer);
+                var reader = file.reader(io, transfer_buffer);
 
-            template = try root.CollectionTemplate.parse(a, try reader.interface.allocRemaining(a, .unlimited), .{
-                .title = tmp.filepath,
-            });
-        }
+                break :blk try root.CollectionTemplate.parse(a, try reader.interface.allocRemaining(a, .unlimited), .{
+                    .title = tmp.name,
+                });
+            }
+            log.warn(
+                \\ creating default template for local collection: {s}
+            , .{remote.handle.name});
+
+            const info = root.CollectionTemplate.Info{
+                .title = try a.dupe(u8, remote.handle.name),
+            };
+            break :blk root.CollectionTemplate{ .info = info };
+        };
 
         const image_items: ?[]ImageItem = blk: {
             if (remote.child != .images) break :blk null;
-            if (template != null and template.?.order != null) {
-                const order = template.?.order.?;
+            if (template.order != null) {
+                const order = template.order.?;
                 var result = try std.ArrayList(ImageItem).initCapacity(a, order.len);
                 for (order) |o_entry| {
                     const matched = match: {
@@ -75,8 +84,8 @@ pub const LocalCollection = struct {
         };
         const coll_items: ?[]CollectionItem = blk: {
             if (remote.child != .collections) break :blk null;
-            if (template != null and template.?.order != null) {
-                const order = template.?.order.?;
+            if (template.order != null) {
+                const order = template.order.?;
                 var result = try std.ArrayList(CollectionItem).initCapacity(a, order.len);
                 for (order) |o_entry| {
                     const matched = match: {
@@ -122,7 +131,7 @@ pub const LocalCollections = root.ImageCategory.Plexe(LocalCollection, &.{
     .handle = undefined,
     .images = undefined,
     .collections = undefined,
-    .template = null,
+    .template = undefined,
 });
 
 pub fn getLocalCollections(a: std.mem.Allocator, io: std.Io, remote: root.remote.RemoteCollections) LocalCollections {

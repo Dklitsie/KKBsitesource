@@ -1,36 +1,25 @@
 <div>
   <!---->
-  ||zz if .template zz||
-  ||zz if .info.title zz||
-  <h1>{| . |}</h1>
-  ||zz endif zz||
-  <!---->
-  ||zz if .info.body zz||
-  <p>{| . |}</p>
-  ||zz endif zz||
-  <!---->
-  ||zz endif zz||
-  <!---->
-  ||zz for .child_collections zz||
-  ||zz if .images zz||
-  ||zz for . zz||
-  <drive-image filepath="{|.file.filepath|}"> </drive-image>
-  ||zz endfor zz||
-  ||zz endif zz||
+  <drive-collection template='{| .template json|}'>
+    ||zz for .children zz||
+    <drive-collection template='{| .template json |}'>
+      ||zz if .images zz||
+      ||zz for . zz||
+      <drive-image filepath='{|.file.filepath|}'> </drive-image>
+      ||zz endfor zz||
+      ||zz endif zz||
 
-  ||zz if .issues zz||
-  ||zz for . zz||
-  <h1>Issue: </h1>
-
-  ||zz for .images zz||
-  <drive-image filepath="{|.file.filepath|}"> </drive-image>
-  ||zz endfor zz||
-
-
-  ||zz endfor zz||
-  ||zz endif zz||
-
-
-  ||zz endfor zz||
+      ||zz if .issues zz||
+      ||zz for . zz||
+      <drive-collection template='{| .template json |}'>
+        ||zz for .images zz||
+        <drive-image filepath='{|.file.filepath|}'> </drive-image>
+        ||zz endfor zz||
+      </drive-collection>
+      ||zz endfor zz||
+      ||zz endif zz||
+    </drive-collection>
+    ||zz endfor zz||
+  </drive-collection>
   <!---->
 </div>

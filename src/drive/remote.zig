@@ -33,6 +33,7 @@ pub const RemoteCollection = struct {
         self.child.deinit(a);
     }
 
+    const TEMPLATE_FILE_NAME = "template";
     pub fn create(
         a: Allocator,
         children_by_parents: *const std.StringArrayHashMapUnmanaged(std.ArrayList(DriveFile)),
@@ -47,6 +48,10 @@ pub const RemoteCollection = struct {
         defer child_collections.deinit(a);
         var template: ?root.FileHandle = null;
 
+        const template_name = blk: {
+            const last_sep = std.mem.findScalarLast(u8, current_path, '/').? + 1;
+            break :blk current_path[last_sep..];
+        };
         for (children.items) |handle| {
             const mime = MimeOption.tryFromStr(handle.mimeType) orelse continue;
 
@@ -66,7 +71,7 @@ pub const RemoteCollection = struct {
                 },
 
                 .doc => {
-                    if (std.ascii.findIgnoreCase(handle.name, "template") == null) {
+                    if (std.ascii.findIgnoreCase(handle.name, TEMPLATE_FILE_NAME) == null) {
                         log.err(
                             \\ Encountered unexpected doc file: '{s}'
                         , .{handle.name});
@@ -82,6 +87,7 @@ pub const RemoteCollection = struct {
                         .id = try a.dupe(u8, handle.id),
                         .filepath = try std.fmt.allocPrint(a, "{s}/{s}", .{ current_path, handle.name }),
                         .modifiedTime = try a.dupe(u8, handle.modifiedTime),
+                        .name = try a.dupe(u8, template_name),
                         .kind = .doc,
                     };
                 },
@@ -89,6 +95,7 @@ pub const RemoteCollection = struct {
                     try image_file_handles.append(a, .{
                         .id = try a.dupe(u8, handle.id),
                         .filepath = try std.fmt.allocPrint(a, "{s}/{s}", .{ current_path, handle.name }),
+                        .name = try a.dupe(u8, handle.name),
                         .modifiedTime = try a.dupe(u8, handle.modifiedTime),
                         .kind = .image,
                     });
@@ -110,15 +117,14 @@ pub const RemoteCollection = struct {
         const collection = RemoteCollection{
             .handle = .{
                 .id = try a.dupe(u8, folder_handle.id),
-                // .filepath = try std.fmt.allocPrint(a, "{s}/{s}", .{ current_path, folder_handle.name }),
                 .filepath = try a.dupe(u8, current_path),
                 .modifiedTime = try a.dupe(u8, folder_handle.modifiedTime),
+                .name = try a.dupe(u8, folder_handle.name),
                 .kind = .folder,
             },
             .child = child,
             .template = template,
         };
-        // try files.append(a, collection);
 
         return collection;
     }

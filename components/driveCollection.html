@@ -1,0 +1,70 @@
+<template id="drive-collection-template">
+  <style>
+  </style>
+
+  <h2 id="title">
+  </h2>
+
+  <p id="body">
+  </p>
+
+  <slot>
+  </slot>
+</template>
+
+<script>
+
+  class DriveCollection extends HTMLElement {
+    constructor() {
+      super();
+
+      const template = document
+        .getElementById('drive-collection-template')
+        .content.cloneNode(true);
+
+      this.attachShadow({mode: 'open'}).appendChild(template);
+    }
+
+
+    /**
+     * @typedef {Object} CollectionTemplate
+     * @property {Info} info
+     * @property {OrderEntry[]|null} order
+     */
+
+    /**
+     * @typedef {Object} Info
+     * @property {string|null} title
+     * @property {string|null} body
+     */
+
+    /**
+     * @typedef {Object} OrderEntry
+     * @property {string} filename
+     * @property {string|null} text
+     */
+
+    connectedCallback() {
+      console.log("Drive Collection Connected")
+      // first we need to get CollectionTemplate as json from the server
+
+      const templateAttr = this.getAttribute('template');
+      /** @type {CollectionTemplate?} */
+      let template;
+      if (templateAttr) {
+        template = JSON.parse(templateAttr);
+        console.log(`Collection template: ${JSON.stringify(template)}`);
+      }
+
+
+      if (template?.info.title) {
+        this.shadowRoot.getElementById('title').textContent = template.info.title;
+      }
+      if (template?.info.body) {
+        this.shadowRoot.getElementById('body').textContent = template.info.body;
+      }
+    }
+  }
+
+  customElements.define('drive-collection', DriveCollection);
+</script>

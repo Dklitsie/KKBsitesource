@@ -8,17 +8,17 @@ pub const Editorials = struct {
     const Collection = struct {
         images: ?[]root.local.ImageItem,
         issues: ?[]Issue,
-        template: ?root.CollectionTemplate,
+        template: root.CollectionTemplate,
     };
 
     const Issue = struct {
         images: []root.local.ImageItem,
-        template: ?root.CollectionTemplate,
+        template: root.CollectionTemplate,
     };
 
     handle: root.FileHandle,
-    child_collections: []Collection,
-    template: ?root.CollectionTemplate,
+    children: []Collection,
+    template: root.CollectionTemplate,
 };
 
 pub const AllTemplates = struct {
@@ -53,7 +53,7 @@ pub const AllTemplates = struct {
                                         , .{issue_ch.collection.handle.filepath});
                                         return error.MissingImages;
                                     },
-                                    .template = issue_ch.collection.template orelse return error.MissingTemplate,
+                                    .template = issue_ch.collection.template,
                                 };
                             }
                             ch.* = .{
@@ -72,7 +72,7 @@ pub const AllTemplates = struct {
 
                     editorials = .{
                         .handle = collection.handle,
-                        .child_collections = child_collections,
+                        .children = child_collections,
                         .template = collection.template,
                     };
                 },

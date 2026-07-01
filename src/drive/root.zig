@@ -79,17 +79,20 @@ pub const ImageCategory = enum {
 pub const FileHandle = struct {
     id: []u8,
     filepath: []u8,
+    name: []u8,
     modifiedTime: []u8,
     kind: remote.MimeOption,
 
     pub fn deinit(self: *@This(), a: std.mem.Allocator) void {
         a.free(self.id);
         a.free(self.filepath);
+        a.free(self.name);
         a.free(self.modifiedTime);
     }
 };
 
 // move to local?
+// should be made non null as a field in other structs and info should just be given a comptime known default
 pub const CollectionTemplate = struct {
     info: Info,
     order: ?[]OrderEntry = null,
