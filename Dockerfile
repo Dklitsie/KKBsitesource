@@ -21,4 +21,4 @@ COPY . .
 RUN zig build -Dcpu=baseline -Doptimize=ReleaseFast
 
 # Default command
-CMD ["./zig-out/bin/zortfolio"]
+CMD ["./zig-out/bin/kkb"]
