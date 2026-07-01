@@ -14,7 +14,7 @@ RUN curl -L https://ziglang.org/download/$ZIGVER/zig-x86_64-linux-$ZIGVER.tar.xz
 ENV PATH="/usr/local/zig:${PATH}"
 
 # Copy source directly into final image
-WORKDIR /zortfolio
+WORKDIR /kkb
 COPY . .
 
 # Build the project

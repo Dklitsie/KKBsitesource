@@ -1,5 +1,5 @@
 .{
-    .name = .zortfolio,
+    .name = .kkb,
     .fingerprint = 0x3cc39afcb1d786fa,
 
     .version = "1.0.0",
