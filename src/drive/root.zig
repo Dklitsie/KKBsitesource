@@ -96,34 +96,70 @@ pub const FileHandle = struct {
 pub const CollectionTemplate = struct {
     info: Info,
     order: ?[]OrderEntry = null,
-    const SEPARATOR = "-\n";
+    const SEPARATOR = "-";
 
     pub fn deinit(self: *@This(), a: std.mem.Allocator) void {
         self.info.deinit(a);
-        if (self.order) |order| a.free(order);
+        if (self.order) |order| for (order) |*e| e.deinit(a);
     }
 
     /// parses for Template with fallback info
     /// fallback will overwrite any null info fields
+    /// should break apart two halves by -\n
     pub fn parse(
         a: std.mem.Allocator,
         text: []const u8,
         info_fallback: Info,
     ) !@This() {
-        const sep_idx = std.ascii.findIgnoreCase(text, SEPARATOR) orelse text.len;
+        const sep_idx = blk: {
+            var line_start: usize = 0;
+            while (line_start < text.len) {
+                const line_end =
+                    std.mem.indexOfScalarPos(u8, text, line_start, '\n') orelse text.len;
 
-        var info = Info.parse(a, text[0..sep_idx]);
+                const line =
+                    std.mem.trim(u8, text[line_start..line_end], &std.ascii.whitespace);
 
-        if (info_fallback.title) |title| {
-            if (info.title == null) info.title = title;
+                if (std.mem.eql(u8, line, "-"))
+                    break :blk line_start;
+
+                line_start = if (line_end == text.len)
+                    text.len
+                else
+                    line_end + 1;
+            }
+
+            break :blk text.len;
+        };
+
+        const info_text = text[0..sep_idx];
+
+        const order_text =
+            if (sep_idx == text.len)
+                null
+            else blk: {
+                const after_sep = std.mem.indexOfScalarPos(u8, text, sep_idx, '\n') orelse text.len - 1;
+                break :blk text[after_sep + 1 ..];
+            };
+
+        var info = Info.parse(a, info_text);
+
+        if (info.title == null) {
+            log.warn(
+                \\ using fallback title
+            , .{});
+            info.title = info_fallback.title;
         }
-        if (info_fallback.body) |body| {
-            if (info.body == null) info.body = body;
+        if (info.body == null) {
+            log.warn(
+                \\ using fallback body
+            , .{});
+            info.body = info_fallback.body;
         }
 
         return .{
             .info = info,
-            .order = if (sep_idx != text.len) try OrderEntry.parseArray(a, text[sep_idx + SEPARATOR.len ..]) else null,
+            .order = if (order_text) |txt| try OrderEntry.parseArray(a, txt) else null,
         };
     }
 
@@ -135,36 +171,49 @@ pub const CollectionTemplate = struct {
             if (self.body) |body| a.free(body);
         }
 
+        pub fn format(self: @This(), w: *std.Io.Writer) !void {
+            try w.writeAll(
+                \\ INFO
+            );
+            if (self.title) |t|
+                try w.print(
+                    \\ TITLE: {s}
+                , .{t});
+
+            if (self.body) |b| try w.print(
+                \\ BODY: {s}
+            , .{b});
+        }
+
         pub fn parse(a: std.mem.Allocator, input: []const u8) @This() {
             const title_prefix = "title:";
             const body_prefix = "body:";
 
+            var lines = std.mem.splitScalar(u8, input, '\n');
             const title = title: {
-                var lines = std.mem.splitScalar(u8, input, '\n');
+                var title_line = lines.first();
+                if (std.mem.trim(u8, title_line, &std.ascii.whitespace).len == 0)
+                    title_line = lines.next() orelse break :title null;
 
-                var title_line = lines.next() orelse break :title null;
                 title_line = std.mem.trimStart(u8, title_line, " \n\t");
 
-                if (!std.ascii.startsWithIgnoreCase(title_line, title_prefix)) break :title null;
-
-                break :title std.mem.trim(
-                    u8,
-                    title_line[title_prefix.len..],
-                    " \t",
-                );
+                if (std.ascii.findIgnoreCase(title_line, title_prefix)) |idx| {
+                    break :title std.mem.trim(
+                        u8,
+                        title_line[idx + title_prefix.len ..],
+                        " \t",
+                    );
+                } else break :title null;
             } orelse null;
 
             const body = body: {
-                var lines = std.mem.splitScalar(u8, input, '\n');
+                const body_section = std.mem.trimStart(u8, lines.rest(), " \n\t");
 
-                var body_line = lines.next() orelse break :body null;
-                body_line = std.mem.trimStart(u8, body_line, " \n\t");
-
-                if (!std.ascii.startsWithIgnoreCase(body_line, body_prefix)) break :body null;
+                if (!std.ascii.startsWithIgnoreCase(body_section, body_prefix)) break :body null;
 
                 break :body std.mem.trim(
                     u8,
-                    body_line[body_prefix.len..],
+                    body_section[body_prefix.len..],
                     " \t",
                 );
             } orelse null;
@@ -242,7 +291,12 @@ test "parseOrder" {
         std.testing.allocator,
         input,
     );
-    defer std.testing.allocator.free(list);
+    defer {
+        for (list) |*v|
+            v.deinit(std.testing.allocator);
+        std.testing.allocator.free(list);
+    }
+
     for (expected, list) |exp, entry| {
         try std.testing.expectEqualStrings(
             exp.filename,
@@ -264,17 +318,18 @@ test "parseOrder" {
 
 test "parseInfo" {
     const input =
-        \\title: Title!
-        \\body: Body text
+        \\Title: Title!
+        \\ Body: Body text
         \\is long
         \\and multiple lines
     ;
 
-    const info = try CollectionTemplate.Info.parse(input);
+    var info = CollectionTemplate.Info.parse(std.testing.allocator, input);
+    defer info.deinit(std.testing.allocator);
 
     try std.testing.expectEqualStrings(
         "Title!",
-        info.title,
+        info.title.?,
     );
 
     try std.testing.expectEqualStrings(
@@ -282,7 +337,7 @@ test "parseInfo" {
         \\is long
         \\and multiple lines
     ,
-        info.body,
+        info.body.?,
     );
 
     std.debug.print(

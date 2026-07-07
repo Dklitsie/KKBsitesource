@@ -94,16 +94,15 @@ pub fn main(init: std.process.Init) !void {
     inline for (drive.ImageCategory.ALL_VARIANTS) |cat| {
         const T = switch (cat) {
             .editorial => drive.templates.Editorials,
+            .portraits, .sketch => drive.templates.ImageCollectionPage,
             else => continue,
-            // .portraits => @ptrCast(templates.portraits),
-            // .sketch => @ptrCast(templates.sketch),
             // .unpublished => @ptrCast(templates.unpublished),
         };
         const inst: *anyopaque = switch (cat) {
             .editorial => @ptrCast(&templates.editorials),
+            .portraits => @ptrCast(&templates.portraits),
+            .sketch => @ptrCast(&templates.sketch),
             else => continue,
-            // .portraits => @ptrCast(templates.portraits),
-            // .sketch => @ptrCast(templates.sketch),
             // .unpublished => @ptrCast(templates.unpublished),
         };
 

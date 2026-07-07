@@ -1,12 +1,31 @@
 <template id="drive-collection-template">
   <style>
+    slot {}
+
+    ::slotted(*) {
+      margin: 1rem;
+      background-color: var(--text);
+    }
+
+
+    #title {
+      font-size: 3rem;
+    }
+
+    section {
+      padding-left: calc(var(--depth) * 1rem);
+      margin-left: calc(var(--depth) * 1rem);
+    }
   </style>
 
-  <h2 id="title">
-  </h2>
+  <section>
+    <h2 id="title">
+    </h2>
 
-  <p id="body">
-  </p>
+
+    <p id="body">
+    </p>
+  </section>
 
   <slot>
   </slot>
@@ -15,6 +34,19 @@
 <script>
 
   class DriveCollection extends HTMLElement {
+    setDepth() {
+      let depth = 0;
+      let p = this.parentElement;
+
+      while (p) {
+        if (p instanceof DriveCollection) {
+          depth++;
+        }
+        p = p.parentElement;
+      }
+      this.style.setProperty("--depth", depth);
+    }
+
     constructor() {
       super();
 
@@ -45,9 +77,7 @@
      */
 
     connectedCallback() {
-      console.log("Drive Collection Connected")
-      // first we need to get CollectionTemplate as json from the server
-
+      this.setDepth();
       const templateAttr = this.getAttribute('template');
       /** @type {CollectionTemplate?} */
       let template;

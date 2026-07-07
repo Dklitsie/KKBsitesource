@@ -6,31 +6,20 @@ const Allocator = std.mem.Allocator;
 
 pub const RemoteCollection = struct {
     handle: root.FileHandle,
-    child: Child,
+    images: ?[]root.FileHandle,
+    collections: ?[]RemoteCollection,
     template: ?root.FileHandle,
-
-    const Child = union(enum) {
-        images: []root.FileHandle,
-        collections: []RemoteCollection,
-
-        pub fn deinit(self: *@This(), a: std.mem.Allocator) void {
-            switch (self.*) {
-                .images => |imgs| {
-                    for (imgs) |*img| img.deinit(a);
-                    a.free(imgs);
-                },
-                .collections => |colls| {
-                    for (colls) |*col| col.deinit(a);
-                    a.free(colls);
-                },
-            }
-        }
-    };
 
     pub fn deinit(self: *@This(), a: Allocator) void {
         self.handle.deinit(a);
         if (self.template) |*t| t.deinit(a);
-        self.child.deinit(a);
+        if (self.collections) |cs| {
+            defer a.free(cs);
+            for (cs) |*col| col.collection.deinit(a);
+        }
+        if (self.images) |imgs| {
+            defer a.free(imgs);
+        }
     }
 
     const TEMPLATE_FILE_NAME = "template";
@@ -103,17 +92,6 @@ pub const RemoteCollection = struct {
             }
         }
 
-        const child: RemoteCollection.Child = blk: {
-            if (image_file_handles.items.len > 0) {
-                if (child_collections.items.len > 0) log.err(
-                    \\ encountered both child folders and images in '{s}'
-                , .{folder_handle.name});
-                break :blk .{ .images = try image_file_handles.toOwnedSlice(a) };
-            } else {
-                break :blk .{ .collections = try child_collections.toOwnedSlice(a) };
-            }
-        };
-
         const collection = RemoteCollection{
             .handle = .{
                 .id = try a.dupe(u8, folder_handle.id),
@@ -122,7 +100,8 @@ pub const RemoteCollection = struct {
                 .name = try a.dupe(u8, folder_handle.name),
                 .kind = .folder,
             },
-            .child = child,
+            .images = if (image_file_handles.items.len > 0) try image_file_handles.toOwnedSlice(a) else null,
+            .collections = if (child_collections.items.len > 0) try child_collections.toOwnedSlice(a) else null,
             .template = template,
         };
 
@@ -132,7 +111,8 @@ pub const RemoteCollection = struct {
 
 pub const RemoteCollections = root.ImageCategory.Plexe(RemoteCollection, &.{
     .handle = undefined,
-    .child = undefined,
+    .images = null,
+    .collections = null,
     .template = null,
 });
 

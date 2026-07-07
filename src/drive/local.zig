@@ -6,7 +6,6 @@ pub const ImageItem = struct { file: root.FileHandle, text: ?[]const u8 };
 pub const CollectionItem = struct { collection: LocalCollection, text: ?[]const u8 };
 pub const LocalCollection = struct {
     handle: root.FileHandle,
-    // remote should have this pattern rather than child
     images: ?[]ImageItem,
     collections: ?[]CollectionItem,
     template: root.CollectionTemplate,
@@ -25,7 +24,7 @@ pub const LocalCollection = struct {
     }
 
     pub fn fromRemote(a: std.mem.Allocator, io: std.Io, remote: root.remote.RemoteCollection) !@This() {
-        log.warn(
+        log.debug(
             \\ creating local collection from remote: {s}
         , .{remote.handle.filepath});
         const template = blk: {
@@ -35,11 +34,17 @@ pub const LocalCollection = struct {
                 const transfer_buffer = try a.alloc(u8, 1024 * 1024);
                 defer a.free(transfer_buffer);
                 var reader = file.reader(io, transfer_buffer);
+                const template_txt = try reader.interface.allocRemaining(a, .unlimited);
 
-                break :blk try root.CollectionTemplate.parse(a, try reader.interface.allocRemaining(a, .unlimited), .{
-                    .title = tmp.name,
-                });
+                break :blk try root.CollectionTemplate.parse(
+                    a,
+                    template_txt,
+                    .{
+                        .title = remote.handle.name,
+                    },
+                );
             }
+
             log.warn(
                 \\ creating default template for local collection: {s}
             , .{remote.handle.name});
@@ -51,13 +56,15 @@ pub const LocalCollection = struct {
         };
 
         const image_items: ?[]ImageItem = blk: {
-            if (remote.child != .images) break :blk null;
+            if (remote.images == null) break :blk null;
             if (template.order != null) {
+                var used = std.StringHashMap(void).init(a);
+                defer used.deinit();
                 const order = template.order.?;
                 var result = try std.ArrayList(ImageItem).initCapacity(a, order.len);
                 for (order) |o_entry| {
                     const matched = match: {
-                        for (remote.child.images) |fh| {
+                        for (remote.images.?) |fh| {
                             const stem = if (std.mem.lastIndexOfScalar(u8, fh.filepath, '/')) |slash|
                                 fh.filepath[slash + 1 ..]
                             else
@@ -66,7 +73,10 @@ pub const LocalCollection = struct {
                                 stem[0..dot]
                             else
                                 stem;
-                            if (std.ascii.eqlIgnoreCase(bare, o_entry.filename)) break :match fh;
+                            if (std.ascii.startsWithIgnoreCase(bare, o_entry.filename)) {
+                                try used.put(fh.filepath, {});
+                                break :match fh;
+                            }
                         } else {
                             log.warn("order entry '{s}' has no matching image, skipping", .{o_entry.filename});
                             continue;
@@ -74,27 +84,38 @@ pub const LocalCollection = struct {
                     };
                     try result.append(a, .{ .file = matched, .text = o_entry.text });
                 }
+
+                for (remote.images.?) |fh| {
+                    if (used.contains(fh.filepath)) continue;
+                    try result.append(a, .{ .file = fh, .text = null });
+                }
+
                 break :blk try result.toOwnedSlice(a);
             } else {
-                var result = try std.ArrayList(ImageItem).initCapacity(a, remote.child.images.len);
-                for (remote.child.images) |fh|
+                var result = try std.ArrayList(ImageItem).initCapacity(a, remote.images.?.len);
+                for (remote.images.?) |fh|
                     try result.append(a, .{ .file = fh, .text = null });
                 break :blk try result.toOwnedSlice(a);
             }
         };
         const coll_items: ?[]CollectionItem = blk: {
-            if (remote.child != .collections) break :blk null;
+            if (remote.collections == null) break :blk null;
             if (template.order != null) {
+                var used = std.StringHashMap(void).init(a);
+                defer used.deinit();
                 const order = template.order.?;
                 var result = try std.ArrayList(CollectionItem).initCapacity(a, order.len);
                 for (order) |o_entry| {
                     const matched = match: {
-                        for (remote.child.collections) |*coll| {
+                        for (remote.collections.?) |*coll| {
                             const stem = if (std.mem.lastIndexOfScalar(u8, coll.handle.filepath, '/')) |slash|
                                 coll.handle.filepath[slash + 1 ..]
                             else
                                 coll.handle.filepath;
-                            if (std.ascii.eqlIgnoreCase(stem, o_entry.filename)) break :match coll;
+                            if (std.ascii.startsWithIgnoreCase(stem, o_entry.filename)) {
+                                try used.put(coll.handle.filepath, {});
+                                break :match coll;
+                            }
                         } else {
                             log.warn("order entry '{s}' has no matching collection, skipping", .{o_entry.filename});
                             continue;
@@ -106,10 +127,18 @@ pub const LocalCollection = struct {
                     };
                     try result.append(a, coll_item);
                 }
+
+                for (remote.collections.?) |coll| {
+                    if (used.contains(coll.handle.filepath)) continue;
+                    try result.append(a, .{
+                        .collection = try LocalCollection.fromRemote(a, io, coll),
+                        .text = null,
+                    });
+                }
                 break :blk try result.toOwnedSlice(a);
             } else {
-                var result = try std.ArrayList(CollectionItem).initCapacity(a, remote.child.collections.len);
-                for (remote.child.collections) |*coll|
+                var result = try std.ArrayList(CollectionItem).initCapacity(a, remote.collections.?.len);
+                for (remote.collections.?) |*coll|
                     try result.append(a, .{
                         .collection = try LocalCollection.fromRemote(a, io, coll.*),
                         .text = null,
@@ -182,23 +211,21 @@ fn diffCollection(
     local_files: *std.StringHashMapUnmanaged(void),
     result: *DiffResult,
 ) !void {
-    switch (collection.child) {
-        .images => |imgs| {
-            for (imgs) |img| {
-                const local_path = try std.fmt.allocPrint(a, root.DRIVE_DIR ++ "{s}", .{img.filepath});
-                defer a.free(local_path);
-                if (local_files.fetchRemove(local_path)) |_| {
-                    // exists locally, up to date
-                } else {
-                    try result.to_download.append(a, img);
-                }
+    if (collection.images) |imgs| {
+        for (imgs) |img| {
+            const local_path = try std.fmt.allocPrint(a, root.DRIVE_DIR ++ "{s}", .{img.filepath});
+            defer a.free(local_path);
+            if (local_files.fetchRemove(local_path)) |_| {
+                // exists locally, up to date
+            } else {
+                try result.to_download.append(a, img);
             }
-        },
-        .collections => |colls| {
-            for (colls) |*coll| {
-                try diffCollection(a, coll, local_files, result);
-            }
-        },
+        }
+    }
+    if (collection.collections) |colls| {
+        for (colls) |*coll| {
+            try diffCollection(a, coll, local_files, result);
+        }
     }
     if (collection.template) |tmpl| {
         if (local_files.fetchRemove(tmpl.filepath)) |_| {

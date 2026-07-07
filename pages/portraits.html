@@ -1,30 +1,8 @@
 <div>
-  <!---->
-  ||zz if .template zz||
-  ||zz if .info.title zz||
-  <h1>{| . |}</h1>
-  ||zz endif zz||
-  <!---->
-  ||zz if .info.body zz||
-  <p>{| . |}</p>
-  ||zz endif zz||
-  <!---->
-  ||zz endif zz||
-  <!---->
-  ||zz if .images zz||
-  <!---->
-  ||zz for . zz||
-  <drive-image filepath="{|.file.filepath|}"> </drive-image>
-  ||zz endfor zz||
-  <!---->
-  ||zz endif zz||
-  <!---->
-  ||zz if .collections zz||
-  <!---->
-  ||zz for . zz||
-  <h1>{|.handle.filepath|}</h1>
-  ||zz endfor zz||
-  <!---->
-  ||zz endif zz||
+  <drive-collection template='{| .template json|}'>
+    ||zz for .images zz||
+    <drive-image filepath='{|.file.filepath|}'> </drive-image>
+    ||zz endfor zz||
+  </drive-collection>
   <!---->
 </div>

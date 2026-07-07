@@ -21,11 +21,19 @@ pub const Editorials = struct {
     template: root.CollectionTemplate,
 };
 
+pub const ImageCollectionPage = struct {
+    handle: root.FileHandle,
+    images: []root.local.ImageItem,
+    template: root.CollectionTemplate,
+};
+
 pub const AllTemplates = struct {
-    editorials: Editorials,
+    editorials: Editorials = undefined,
+    portraits: ImageCollectionPage = undefined,
+    sketch: ImageCollectionPage = undefined,
 
     pub fn createAllTemplates(a: std.mem.Allocator, local_collections: root.local.LocalCollections) anyerror!@This() {
-        var editorials: Editorials = undefined;
+        var templates = AllTemplates{};
 
         inline for (root.ImageCategory.ALL_VARIANTS) |cat| {
             const collection = local_collections.getFieldConst(cat);
@@ -70,20 +78,39 @@ pub const AllTemplates = struct {
                         }
                     }
 
-                    editorials = .{
+                    templates.editorials = .{
                         .handle = collection.handle,
                         .children = child_collections,
                         .template = collection.template,
                     };
                 },
+                .portraits, .sketch => |v| {
+                    const collection_images = collection.images orelse {
+                        log.err(
+                            \\ Editorials is missing child collections
+                        , .{});
+                        return error.MissingCollections;
+                    };
+                    const images = try a.dupe(root.local.ImageItem, collection_images);
+
+                    switch (v) {
+                        .portraits => templates.portraits = .{
+                            .handle = collection.handle,
+                            .images = images,
+                            .template = collection.template,
+                        },
+                        .sketch => templates.sketch = .{
+                            .handle = collection.handle,
+                            .images = images,
+                            .template = collection.template,
+                        },
+                        else => unreachable,
+                    }
+                },
                 .unpublished => {},
-                .sketch => {},
-                .portraits => {},
             }
         }
 
-        return .{
-            .editorials = editorials,
-        };
+        return templates;
     }
 };

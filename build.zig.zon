@@ -1,6 +1,6 @@
 .{
     .name = .kkb,
-    .fingerprint = 0x3cc39afcb1d786fa,
+    .fingerprint = 0x9e764fcbe2deb921,
 
     .version = "1.0.0",
 
