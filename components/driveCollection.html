@@ -4,21 +4,33 @@
 
     ::slotted(*) {
       margin: 1rem;
-      background-color: var(--text);
     }
-
 
     #title {
       font-size: 3rem;
     }
 
-    section {
+    section.text {
       padding-left: calc(var(--depth) * 1rem);
       margin-left: calc(var(--depth) * 1rem);
+      color: var(--text);
+    }
+
+    section.slot {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 1rem;
+      padding: 0.5rem;
+      margin: 1rem;
+      background-color: color-mix(in srgb, var(--text) 50%, transparent);
+    }
+
+    :host([depth-not-zero]) section.text {
+      color: var(--bg);
     }
   </style>
 
-  <section>
+  <section class="text">
     <h2 id="title">
     </h2>
 
@@ -27,8 +39,10 @@
     </p>
   </section>
 
-  <slot>
-  </slot>
+  <section class="slot">
+    <slot>
+    </slot>
+  </section>
 </template>
 
 <script>
@@ -44,6 +58,8 @@
         }
         p = p.parentElement;
       }
+
+      this.toggleAttribute("depth-not-zero", depth !== 0);
       this.style.setProperty("--depth", depth);
     }
 
