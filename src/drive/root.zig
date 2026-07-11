@@ -89,6 +89,20 @@ pub const FileHandle = struct {
         a.free(self.name);
         a.free(self.modifiedTime);
     }
+
+    pub fn webpPath(self: @This(), a: std.mem.Allocator) std.mem.Allocator.Error!?[]u8 {
+        if (std.mem.findScalar(u8, self.filepath, '.') == null) {
+            log.err(
+                \\ called webpPath on file without extension: 
+                \\ path: {s}
+                \\ name: {s}
+            , .{ self.filepath, self.name });
+            return null;
+        }
+        var iter = std.mem.splitBackwardsScalar(u8, self.filepath, '.');
+        _ = iter.first();
+        return try std.fmt.allocPrint(a, "{s}.webp", .{iter.rest()});
+    }
 };
 
 // move to local?

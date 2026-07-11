@@ -39,9 +39,8 @@ ThisOneHasNoText
 ```
 
 ## TODO
-- [x] Write parsers for `template` 
-- [x] Pipeline improvements after the above
-- [ ] finalize editorial
+- [ ] Images as webp
 - [ ] finalize drive diff management (with tests!!) 
 - [ ] Create drive watcher
-- [ ] finalize rest of pages
+- [ ] Editorial made into flat images 
+- [ ] finalize pages data

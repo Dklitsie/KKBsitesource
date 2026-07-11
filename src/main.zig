@@ -7,7 +7,7 @@ const zyph = @import("zyph");
 const Request = std.http.Server.Request;
 
 pub const std_options = std.Options{
-    .log_level = .debug,
+    .log_level = .warn,
     .log_scope_levels = &.{
         .{ .scope = .Lexer, .level = .warn },
         .{ .scope = .render, .level = .warn },
@@ -51,6 +51,21 @@ pub fn main(init: std.process.Init) !void {
     defer client.deinit();
     defer allocator.free(auth_header.override);
 
+    const ffmpeg_path = blk: {
+        const result = try std.process.spawn(init.io, .{
+            .environ_map = init.environ_map,
+            .argv = &.{ "which", "ffmpeg" },
+            .stdout = .pipe,
+        });
+        const stdout = result.stdout.?;
+        var reader = stdout.reader(init.io, &.{});
+        break :blk std.mem.trim(u8, try reader.interface.allocRemaining(allocator, .unlimited), &std.ascii.whitespace);
+    };
+    std.log.debug(
+        \\ ffmpeg path: '{s}'
+    , .{ffmpeg_path});
+    defer allocator.free(ffmpeg_path);
+
     var drive_remote = try drive.remote.getRemoteCollections(
         allocator,
         &client,
@@ -71,6 +86,7 @@ pub fn main(init: std.process.Init) !void {
     try drive.remote.downloadFiles(
         allocator,
         auth_header,
+        ffmpeg_path,
         diff.to_download.items,
         8,
     );

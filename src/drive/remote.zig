@@ -182,6 +182,7 @@ pub const SyncContext = struct {
     client: std.http.Client,
     auth_header: std.http.Client.Request.Headers.Value,
     files: []root.FileHandle,
+    ffmpeg_path: []const u8,
     err: ?anyerror = null,
 
     pub fn worker(self: *@This()) void {
@@ -191,6 +192,7 @@ pub const SyncContext = struct {
                     downloadImageFile(
                         self.allocator,
                         self.io,
+                        self.ffmpeg_path,
                         &self.client,
                         self.auth_header,
                         file,
@@ -234,6 +236,7 @@ pub const SyncContext = struct {
 pub fn downloadFiles(
     a: std.mem.Allocator,
     auth_header: std.http.Client.Request.Headers.Value,
+    ffmpeg_path: []const u8,
     files_to_download: []root.FileHandle,
     amt_threads: usize,
 ) anyerror!void {
@@ -272,6 +275,7 @@ pub fn downloadFiles(
             .client = client,
             .auth_header = auth_header,
             .files = files_slice,
+            .ffmpeg_path = ffmpeg_path,
         };
         thread.* = try std.Thread.spawn(
             .{},
@@ -501,23 +505,70 @@ fn sortFolderFilesByMime(a: Allocator, folder_files: std.json.Parsed(DriveRespon
     );
 }
 
+fn downloadAsWebp(
+    io: std.Io,
+    ffmpeg_path: []const u8,
+    image_bytes: []const u8,
+    output_path: []const u8,
+) !void {
+    log.debug(
+        \\ saving {s}
+    , .{output_path});
+    var child = try std.process.spawn(io, .{
+        .argv = &.{
+            ffmpeg_path,
+            "-y",
+            "-loglevel",
+            "error",
+            "-i",
+            "pipe:0",
+            "-update",
+            "1",
+            "-frames:v",
+            "1",
+            output_path,
+        },
+        .stdin = .pipe,
+        .stdout = .ignore,
+        .stderr = .inherit,
+    });
+
+    {
+        const stdin = child.stdin.?;
+        defer {
+            stdin.close(io);
+            // so we don't get a double free when the child is waited on
+            child.stdin = null;
+        }
+        try stdin.writeStreamingAll(io, image_bytes);
+    }
+
+    const term = try child.wait(io);
+    switch (term) {
+        .exited => |code| {
+            if (code != 0)
+                return error.FFmpegFailed;
+        },
+        else => return error.FFmpegFailed,
+    }
+}
+
+/// downloads file as webp
 fn downloadImageFile(
     a: Allocator,
     io: std.Io,
+    ffmpeg_path: []const u8,
     client: *std.http.Client,
     auth_header: std.http.Client.Request.Headers.Value,
     file_handle: root.FileHandle,
 ) !void {
-    // const output_path = try std.fmt.allocPrint(
-    //     a,
-    //     root.DRIVE_DIR ++ "{s}",
-    //     .{file_handle.filepath},
-    // );
-    // defer a.free(output_path);
-
     const cwd = std.Io.Dir.cwd();
+
+    const new_file_path = (try file_handle.webpPath(a)).?;
+    defer a.free(new_file_path);
+
     // Skip existing files.
-    cwd.access(io, file_handle.filepath, .{}) catch {
+    cwd.access(io, new_file_path, .{}) catch {
         const last_backslash = std.mem.findScalarLast(u8, file_handle.filepath, '/') orelse {
             log.err(
                 \\ filepath '{s}' has no backslash?
@@ -575,17 +626,8 @@ fn downloadImageFile(
             return error.DownloadFailed;
         }
 
-        var out = cwd.createFile(io, file_handle.filepath, .{}) catch |err| {
-            log.err(
-                \\ Error creating image file '{s}': {s}
-            , .{ file_handle.filepath, @errorName(err) });
-            return err;
-        };
-        defer out.close(io);
-
-        try out.writeStreamingAll(io, body);
-
-        log.info("downloaded {s}", .{file_handle.filepath});
+        try downloadAsWebp(io, ffmpeg_path, body, new_file_path);
+        log.info("downloaded {s} as webp", .{file_handle.filepath});
     };
 }
 

@@ -64,7 +64,14 @@ pub const LocalCollection = struct {
                 var result = try std.ArrayList(ImageItem).initCapacity(a, order.len);
                 for (order) |o_entry| {
                     const matched = match: {
-                        for (remote.images.?) |fh| {
+                        for (remote.images.?) |*fh| {
+                            if (used.contains(fh.filepath)) continue;
+                            {
+                                const webp_path = (try fh.webpPath(a)).?;
+                                a.free(fh.*.filepath);
+                                fh.*.filepath = webp_path;
+                            }
+
                             const stem = if (std.mem.lastIndexOfScalar(u8, fh.filepath, '/')) |slash|
                                 fh.filepath[slash + 1 ..]
                             else
@@ -73,28 +80,38 @@ pub const LocalCollection = struct {
                                 stem[0..dot]
                             else
                                 stem;
+
                             if (std.ascii.startsWithIgnoreCase(bare, o_entry.filename)) {
                                 try used.put(fh.filepath, {});
-                                break :match fh;
+                                break :match fh.*;
                             }
                         } else {
                             log.warn("order entry '{s}' has no matching image, skipping", .{o_entry.filename});
                             continue;
                         }
                     };
+                    log.warn("matched image: {s}", .{matched.filepath});
                     try result.append(a, .{ .file = matched, .text = o_entry.text });
                 }
 
-                for (remote.images.?) |fh| {
+                for (remote.images.?) |*fh| {
                     if (used.contains(fh.filepath)) continue;
-                    try result.append(a, .{ .file = fh, .text = null });
+
+                    {
+                        const webp_path = (try fh.webpPath(a)).?;
+                        a.free(fh.*.filepath);
+                        fh.*.filepath = webp_path;
+                    }
+
+                    try result.append(a, .{ .file = fh.*, .text = null });
                 }
 
                 break :blk try result.toOwnedSlice(a);
             } else {
                 var result = try std.ArrayList(ImageItem).initCapacity(a, remote.images.?.len);
-                for (remote.images.?) |fh|
+                for (remote.images.?) |fh| {
                     try result.append(a, .{ .file = fh, .text = null });
+                }
                 break :blk try result.toOwnedSlice(a);
             }
         };
