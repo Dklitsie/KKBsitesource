@@ -1,7 +1,7 @@
 FROM debian:12
 
 # Install dependencies
-RUN apt-get update && apt-get install -y curl xz-utils libc6-dev jq fmmpeg && \
+RUN apt-get update && apt-get install -y curl xz-utils libc6-dev jq ffmpeg && \
     rm -rf /var/lib/apt/lists/*
 
 # Set up Zig
